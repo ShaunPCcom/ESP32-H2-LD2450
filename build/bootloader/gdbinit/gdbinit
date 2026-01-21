@@ -1,0 +1,2 @@
+source /home/shaun/src/ld2450-zb-h2/ld2450_zb_h2/build/bootloader/gdbinit/symbols
+source /home/shaun/src/ld2450-zb-h2/ld2450_zb_h2/build/bootloader/gdbinit/connect
