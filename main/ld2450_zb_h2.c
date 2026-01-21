@@ -5,6 +5,8 @@
 
 #include "ld2450.h"
 
+#include "board_config.h"
+
 static const char *TAG = "app";
 
 void app_main(void)
@@ -18,10 +20,10 @@ void app_main(void)
     // TODO: Set these to match your ESP32-H2 board wiring.
     // For now, these are placeholders that compile.
     ld2450_config_t cfg = {
-        .uart_num = UART_NUM_1,
-        .tx_gpio = 17,
-        .rx_gpio = 18,
-        .baud_rate = 256000,   // confirm LD2450 baud when hardware arrives
+        .uart_num  = LD2450_UART_NUM,
+        .tx_gpio   = LD2450_UART_TX_GPIO,
+        .rx_gpio   = LD2450_UART_RX_GPIO,
+        .baud_rate = LD2450_UART_BAUD,
         .rx_buf_size = 2048
     };
 
