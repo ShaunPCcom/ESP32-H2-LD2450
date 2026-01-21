@@ -8,3 +8,8 @@ When third-party code is added, this file will be updated with:
 - License
 - Commit hash / version
 - Summary of modifications
+
+## TillFleisch/ESPHome-HLK-LD2450 (MIT)
+
+Upstream: https://github.com/TillFleisch/ESPHome-HLK-LD2450
+License text: third_party/ESPHome-HLK-LD2450/LICENCE
