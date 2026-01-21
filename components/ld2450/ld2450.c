@@ -5,6 +5,9 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include <inttypes.h>
+#include "ld2450_parser.h"
+
 
 static const char *TAG = "ld2450";
 
@@ -18,13 +21,39 @@ static void ld2450_uart_task(void *arg)
 
     ESP_LOGI(TAG, "UART task started on uart=%d", (int)s_uart_num);
 
+    ld2450_parser_t *parser = ld2450_parser_create();
+    if (!parser) {
+        ESP_LOGE(TAG, "ld2450_parser_create failed");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    ld2450_report_t last = {0};
+    bool have_last = false;
+
     while (1) {
         // Block up to 1s waiting for data
         int n = uart_read_bytes(s_uart_num, buf, buf_len, pdMS_TO_TICKS(1000));
         if (n > 0) {
-            // Print as hex so we can see framing later
-            ESP_LOGI(TAG, "RX %d bytes", n);
-            ESP_LOG_BUFFER_HEX_LEVEL(TAG, buf, n, ESP_LOG_INFO);
+            if (ld2450_parser_feed(parser, buf, (size_t)n)) {
+                const ld2450_report_t *r = ld2450_parser_get_report(parser);
+
+                bool changed = !have_last || memcmp(&last, r, sizeof(*r)) != 0;
+                if (changed) {
+                    ESP_LOGI(TAG, "report: occupied=%d target_count=%u",
+                             (int)r->occupied, (unsigned)r->target_count);
+
+                    for (unsigned i = 0; i < r->target_count && i < 3; i++) {
+                        const ld2450_target_t *t = &r->targets[i];
+                        ESP_LOGI(TAG,
+                                 "  T%u: present=%d x_mm=%d y_mm=%d speed=%d",
+                                 i, (int)t->present, (int)t->x_mm, (int)t->y_mm, (int)t->speed);
+                    }
+
+                    last = *r;        // struct copy
+                    have_last = true;
+                }
+            }
         }
     }
 }

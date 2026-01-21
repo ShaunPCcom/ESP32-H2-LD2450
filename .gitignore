@@ -1,0 +1,7 @@
+
+# ESP-IDF build output
+build/
+
+# host_test build outputs
+tools/host_test/test_ld2450_parser
+tools/host_test/test_ld2450_parser_stream
