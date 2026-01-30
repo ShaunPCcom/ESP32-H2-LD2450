@@ -7,7 +7,19 @@
 #include "esp_log.h"
 #include <inttypes.h>
 #include "ld2450_parser.h"
+#include "ld2450_zone.h"
 
+#define LD2450_ZONE_COUNT 5
+#define ZONE_ID_USER(z) ((z) + 1)
+
+static ld2450_zone_t s_zones[LD2450_ZONE_COUNT] = {
+    // Example placeholders (you will replace these later from HA/Zigbee config)
+    { .enabled=true, .v={{0,500},{500,500},{500,1500},{0,1500}} },     // Zone0
+    { .enabled=false, .v={{0,0},{0,0},{0,0},{0,0}} },                  // Zone1
+    { .enabled=false, .v={{0,0},{0,0},{0,0},{0,0}} },                  // Zone2
+    { .enabled=false, .v={{0,0},{0,0},{0,0},{0,0}} },                  // Zone3
+    { .enabled=false, .v={{0,0},{0,0},{0,0},{0,0}} },                  // Zone4
+};
 
 static const char *TAG = "ld2450";
 
@@ -39,20 +51,50 @@ static void ld2450_uart_task(void *arg)
                 const ld2450_report_t *r = ld2450_parser_get_report(parser);
 
                 bool changed = !have_last || memcmp(&last, r, sizeof(*r)) != 0;
-                if (changed) {
-                    ESP_LOGI(TAG, "report: occupied=%d target_count=%u",
-                             (int)r->occupied, (unsigned)r->target_count);
+            if (changed) {
+	        ESP_LOGI(TAG, "report: occupied=%d target_count=%u",
+	            (int)r->occupied, (unsigned)r->target_count);
+               
+                for (unsigned i = 0; i < r->target_count && i < 3; i++) {
+	            const ld2450_target_t *t = &r->targets[i];
+	            ESP_LOGI(TAG,
+                        "  T%u: present=%d x_mm=%d y_mm=%d speed=%d",
+                        i, (int)t->present, (int)t->x_mm, (int)t->y_mm, (int)t->speed);
+	        }		
 
-                    for (unsigned i = 0; i < r->target_count && i < 3; i++) {
-                        const ld2450_target_t *t = &r->targets[i];
-                        ESP_LOGI(TAG,
-                                 "  T%u: present=%d x_mm=%d y_mm=%d speed=%d",
-                                 i, (int)t->present, (int)t->x_mm, (int)t->y_mm, (int)t->speed);
-                    }
+	        // ---- Zone evaluation ----
+                bool zone_occ[LD2450_ZONE_COUNT] = {0};
+                
+		for (unsigned zi = 0; zi < LD2450_ZONE_COUNT; zi++) {
+                    if (!s_zones[zi].enabled)
+                        continue;
 
-                    last = *r;        // struct copy
-                    have_last = true;
-                }
+        	    for (unsigned ti = 0; ti < r->target_count && ti < 3; ti++) {
+            	        const ld2450_target_t *t = &r->targets[ti];
+            		if (!t->present)
+                	    continue;
+
+            		ld2450_point_t p = { .x_mm = t->x_mm, .y_mm = t->y_mm };
+                        if (ld2450_zone_contains_point(&s_zones[zi], p)) {
+                	    zone_occ[zi] = true;
+	                    break;
+            		}
+        	    }
+    		}
+
+    		// ---- Zone change logging ----
+    		static bool last_zone_occ[LD2450_ZONE_COUNT] = {0};
+
+  		for (unsigned zi = 0; zi < LD2450_ZONE_COUNT; zi++) {
+		    if (zone_occ[zi] != last_zone_occ[zi]) {
+            		ESP_LOGI(TAG, "zone%u: %s", ZONE_ID_USER(zi), zone_occ[zi] ? "occupied" : "clear");
+            		last_zone_occ[zi] = zone_occ[zi];
+        	    }
+     		}
+
+	        last = *r;        // struct copy
+	        have_last = true;
+		}
             }
         }
     }
