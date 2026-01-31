@@ -7,13 +7,15 @@
 #include "board_config.h"
 #include "ld2450.h"
 #include "ld2450_cli.h"
+#include "sdkconfig.h"
+#include "zigbee_app.h"
 
 static const char *TAG = "ld2450_hwtest";
 
 void app_main(void)
 {
-    // NVS is commonly required by IDF subsystems; keep it initialized even if
-    // we don't use it directly yet.
+    ESP_LOGI(TAG, "Zigbee role: %s", CONFIG_LD2450_ZB_ROUTER ? "router" : "end device");
+
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -22,7 +24,6 @@ void app_main(void)
         ESP_ERROR_CHECK(err);
     }
 
-    // Minimal LD2450 init; the component owns UART/task setup internally.
     ld2450_config_t cfg = {
         .uart_num     = LD2450_UART_NUM,
         .tx_gpio      = LD2450_UART_TX_GPIO,
@@ -32,12 +33,15 @@ void app_main(void)
     };
 
     ESP_ERROR_CHECK(ld2450_init(&cfg));
+
+    /* Bring up CLI early so we can debug even if Zigbee gets noisy */
     ld2450_cli_start();
 
+    /* Zigbee bring-up */
+    zigbee_app_start();
 
-    ESP_LOGI(TAG, "LD2450 initialized. running=%d", ld2450_is_running());
+    ESP_LOGI(TAG, "LD2450 initialized.");
 
-// app_main has nothing else to do; sensor runs in its own task
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(60000));
     }

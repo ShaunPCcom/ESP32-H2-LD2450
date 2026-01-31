@@ -1,0 +1,10 @@
+menu "LD2450 Zigbee Device Options"
+
+config LD2450_ZB_ROUTER
+    bool "Zigbee router mode (mains-powered)"
+    default y
+    help
+        Enable this for a mains-powered device that should act as a Zigbee Router.
+        Disable for a Zigbee End Device (sleepy/non-router).
+
+endmenu

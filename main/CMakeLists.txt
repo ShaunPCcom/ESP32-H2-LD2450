@@ -1,8 +1,17 @@
 idf_component_register(
-    SRCS "ld2450_zb_h2.c" "ld2450_cli.c"
-    INCLUDE_DIRS "."
-    PRIV_REQUIRES nvs_flash
-    REQUIRES ld2450
-
+    SRCS
+        "ld2450_zb_h2.c"
+        "ld2450_cli.c"
+        "zigbee_app.c"
+        "zgp_stub.c"
+    INCLUDE_DIRS
+        "."
+    PRIV_REQUIRES
+        nvs_flash
+    REQUIRES
+        ld2450
+        espressif__esp-zigbee-lib
+        espressif__esp-zboss-lib
+    WHOLE_ARCHIVE
 )
 
