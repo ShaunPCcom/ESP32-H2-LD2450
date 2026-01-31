@@ -1,15 +1,12 @@
 #include <stdio.h>
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
 #include "esp_err.h"
 #include "esp_log.h"
-
 #include "nvs_flash.h"
-
 #include "board_config.h"
 #include "ld2450.h"
+#include "ld2450_cli.h"
 
 static const char *TAG = "ld2450_hwtest";
 
@@ -35,6 +32,8 @@ void app_main(void)
     };
 
     ESP_ERROR_CHECK(ld2450_init(&cfg));
+    ld2450_cli_start();
+
 
     ESP_LOGI(TAG, "LD2450 initialized. running=%d", ld2450_is_running());
 
