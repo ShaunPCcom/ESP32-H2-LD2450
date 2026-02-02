@@ -111,6 +111,7 @@ static void configure_reporting(void)
 
 static void steering_retry_cb(uint8_t param)
 {
+    board_led_set_state(BOARD_LED_PAIRING);
     esp_zb_bdb_start_top_level_commissioning(param);
 }
 
@@ -154,6 +155,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
             occupancy_bridge_start();
         } else {
             ESP_LOGW(TAG, "Steering failed (%s), retrying...", esp_err_to_name(status));
+            board_led_set_state(BOARD_LED_NOT_JOINED);
             esp_zb_scheduler_alarm(steering_retry_cb,
                                    ESP_ZB_BDB_NETWORK_STEERING, 1000);
         }
@@ -161,9 +163,10 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
 
     case ESP_ZB_ZDO_SIGNAL_LEAVE:
         ESP_LOGW(TAG, "Left network");
-        board_led_set_state(BOARD_LED_PAIRING);
         s_network_joined = false;
-        esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_NETWORK_STEERING);
+        board_led_set_state(BOARD_LED_NOT_JOINED);
+        esp_zb_scheduler_alarm(steering_retry_cb,
+                               ESP_ZB_BDB_NETWORK_STEERING, 1000);
         break;
 
     case ESP_ZB_COMMON_SIGNAL_CAN_SLEEP:
