@@ -15,6 +15,8 @@
 #include "driver/uart.h"
 
 #include "ld2450.h"
+#include "ld2450_cmd.h"
+#include "nvs_config.h"
 
 static const char *TAG = "ld2450_cli";
 
@@ -36,6 +38,11 @@ static void print_help(void)
         "  ld zones\n"
         "  ld zone <1-5> <on|off>\n"
         "  ld zone <1-5> on x1 y1 x2 y2 x3 y3 x4 y4   (meters)\n"
+        "  ld maxdist <mm>              (0-6000)\n"
+        "  ld angle <left> <right>      (0-90 degrees)\n"
+        "  ld bt <on|off>\n"
+        "  ld coords <on|off>\n"
+        "  ld config\n"
         "  ld reboot\n\n"
     );
 }
@@ -54,9 +61,15 @@ static void print_state(void)
            (unsigned)s.target_count_effective,
            (unsigned)s.zone_bitmap);
 
+    for (int i = 0; i < 3; i++) {
+        if (s.targets[i].present) {
+            printf("  T%d: x=%d y=%d speed=%d\n",
+                   i + 1, (int)s.targets[i].x_mm, (int)s.targets[i].y_mm, (int)s.targets[i].speed);
+        }
+    }
     if (s.target_count_effective > 0) {
-        printf("selected: x_mm=%d y_mm=%d speed=%d present=%d\n",
-               (int)s.selected.x_mm, (int)s.selected.y_mm, (int)s.selected.speed, (int)s.selected.present);
+        printf("selected: x_mm=%d y_mm=%d speed=%d\n",
+               (int)s.selected.x_mm, (int)s.selected.y_mm, (int)s.selected.speed);
     }
 }
 
@@ -79,6 +92,20 @@ static void print_zones(void)
     }
 }
 
+static void print_config(void)
+{
+    nvs_config_t cfg;
+    if (nvs_config_get(&cfg) != ESP_OK) {
+        printf("config: error\n");
+        return;
+    }
+    printf("config: max_dist=%u angle_l=%u angle_r=%u bt_off=%u mode=%s coords=%s\n",
+           cfg.max_distance_mm, cfg.angle_left_deg, cfg.angle_right_deg,
+           cfg.bt_disabled,
+           cfg.tracking_mode ? "single" : "multi",
+           cfg.publish_coords ? "on" : "off");
+}
+
 static void cli_task(void *arg)
 {
     (void)arg;
@@ -97,31 +124,28 @@ static void cli_task(void *arg)
             continue;
         }
 
-        // Echo (idf.py monitor often doesn't echo)
+        // Echo
         uart_write_bytes(console_uart, (const char *)&ch, 1);
 
         if (ch == '\r' || ch == '\n') {
-            // Normalize line endings; ensure we have a clean C-string
             line[len] = '\0';
             len = 0;
 
-            // trim leading spaces
             char *p = line;
             while (*p && isspace((unsigned char)*p)) p++;
 
-            // require "ld"
             if (strncmp(p, "ld", 2) != 0 || (p[2] && !isspace((unsigned char)p[2]) && p[2] != '\0')) {
                 continue;
             }
             p += 2;
             while (*p && isspace((unsigned char)*p)) p++;
 
-            // tokenize
             char *cmd = strtok(p, " \t\r\n");
             if (!cmd) { print_help(); continue; }
 
             if (strcmp(cmd, "help") == 0) { print_help(); continue; }
             if (strcmp(cmd, "state") == 0) { print_state(); continue; }
+            if (strcmp(cmd, "config") == 0) { print_config(); continue; }
 
             if (strcmp(cmd, "en") == 0) {
                 char *v = strtok(NULL, " \t\r\n");
@@ -137,13 +161,69 @@ static void cli_task(void *arg)
                 if (!v) { printf("usage: ld mode <single|multi>\n"); continue; }
                 if (strcmp(v, "single") == 0) {
                     ld2450_set_tracking_mode(LD2450_TRACK_SINGLE);
-                    printf("mode=single\n");
+                    nvs_config_save_tracking_mode(1);
+                    printf("mode=single (saved)\n");
                 } else if (strcmp(v, "multi") == 0) {
                     ld2450_set_tracking_mode(LD2450_TRACK_MULTI);
-                    printf("mode=multi\n");
+                    nvs_config_save_tracking_mode(0);
+                    printf("mode=multi (saved)\n");
                 } else {
                     printf("usage: ld mode <single|multi>\n");
                 }
+                continue;
+            }
+
+            if (strcmp(cmd, "coords") == 0) {
+                char *v = strtok(NULL, " \t\r\n");
+                if (!v) { printf("usage: ld coords <on|off>\n"); continue; }
+                bool on = strcmp(v, "on") == 0;
+                ld2450_set_publish_coords(on);
+                nvs_config_save_publish_coords(on ? 1 : 0);
+                printf("coords=%s (saved)\n", on ? "on" : "off");
+                continue;
+            }
+
+            if (strcmp(cmd, "maxdist") == 0) {
+                char *v = strtok(NULL, " \t\r\n");
+                if (!v) { printf("usage: ld maxdist <mm> (0-6000)\n"); continue; }
+                uint16_t mm = (uint16_t)atoi(v);
+                nvs_config_save_max_distance(mm);
+
+                nvs_config_t cfg;
+                nvs_config_get(&cfg);
+                ld2450_cmd_apply_distance_angle(cfg.max_distance_mm,
+                                                 cfg.angle_left_deg,
+                                                 cfg.angle_right_deg);
+                printf("maxdist=%u mm (saved, applied)\n", cfg.max_distance_mm);
+                continue;
+            }
+
+            if (strcmp(cmd, "angle") == 0) {
+                char *lv = strtok(NULL, " \t\r\n");
+                char *rv = strtok(NULL, " \t\r\n");
+                if (!lv || !rv) { printf("usage: ld angle <left> <right> (0-90)\n"); continue; }
+                uint8_t left = (uint8_t)atoi(lv);
+                uint8_t right = (uint8_t)atoi(rv);
+                nvs_config_save_angle_left(left);
+                nvs_config_save_angle_right(right);
+
+                nvs_config_t cfg;
+                nvs_config_get(&cfg);
+                ld2450_cmd_apply_distance_angle(cfg.max_distance_mm,
+                                                 cfg.angle_left_deg,
+                                                 cfg.angle_right_deg);
+                printf("angle left=%u right=%u (saved, applied)\n",
+                       cfg.angle_left_deg, cfg.angle_right_deg);
+                continue;
+            }
+
+            if (strcmp(cmd, "bt") == 0) {
+                char *v = strtok(NULL, " \t\r\n");
+                if (!v) { printf("usage: ld bt <on|off>\n"); continue; }
+                bool on = strcmp(v, "on") == 0;
+                ld2450_cmd_set_bluetooth(on);
+                nvs_config_save_bt_disabled(on ? 0 : 1);
+                printf("bt=%s (saved, restart sensor to take effect)\n", on ? "on" : "off");
                 continue;
             }
 
@@ -163,7 +243,12 @@ static void cli_task(void *arg)
 
                 if (strcmp(onoff, "off") == 0) {
                     z.enabled = false;
-                    printf(ld2450_set_zone((size_t)zi, &z) == ESP_OK ? "zone%d disabled\n" : "zone%d update failed\n", zi + 1);
+                    if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {
+                        nvs_config_save_zone((uint8_t)zi, &z);
+                        printf("zone%d disabled (saved)\n", zi + 1);
+                    } else {
+                        printf("zone%d update failed\n", zi + 1);
+                    }
                     continue;
                 }
 
@@ -172,14 +257,18 @@ static void cli_task(void *arg)
                     continue;
                 }
 
-                // optional coords (8 floats meters)
                 char *coords[8];
                 for (int i = 0; i < 8; i++) coords[i] = strtok(NULL, " \t\r\n");
 
                 z.enabled = true;
 
                 if (!coords[0]) {
-                    printf(ld2450_set_zone((size_t)zi, &z) == ESP_OK ? "zone%d enabled\n" : "zone%d update failed\n", zi + 1);
+                    if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {
+                        nvs_config_save_zone((uint8_t)zi, &z);
+                        printf("zone%d enabled (saved)\n", zi + 1);
+                    } else {
+                        printf("zone%d update failed\n", zi + 1);
+                    }
                     continue;
                 }
 
@@ -197,7 +286,12 @@ static void cli_task(void *arg)
                     z.v[i].y_mm = m_to_mm(ym);
                 }
 
-                printf(ld2450_set_zone((size_t)zi, &z) == ESP_OK ? "zone%d set\n" : "zone%d update failed\n", zi + 1);
+                if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {
+                    nvs_config_save_zone((uint8_t)zi, &z);
+                    printf("zone%d set (saved)\n", zi + 1);
+                } else {
+                    printf("zone%d update failed\n", zi + 1);
+                }
 
 zone_done:
                 continue;
@@ -231,8 +325,6 @@ void ld2450_cli_start(void)
 {
     const uart_port_t console_uart = (uart_port_t)CONFIG_ESP_CONSOLE_UART_NUM;
 
-    // Ensure UART driver is installed for console UART so uart_read_bytes() works.
-    // If already installed, ESP_ERR_INVALID_STATE is fine.
     esp_err_t err = uart_driver_install(console_uart, 1024, 0, 0, NULL, 0);
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
         ESP_LOGE(TAG, "uart_driver_install(console_uart=%d) failed: %s", (int)console_uart, esp_err_to_name(err));

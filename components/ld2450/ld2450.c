@@ -209,6 +209,8 @@ static void ld2450_uart_task(void *arg)
                 s_state.target_count_raw = r->target_count;
                 s_state.target_count_effective = eff_count;
                 s_state.selected = selected;
+                memcpy(s_state.targets, r->targets, sizeof(s_state.targets));
+                memcpy(s_state.zone_occupied, zone_occ, sizeof(s_state.zone_occupied));
                 s_state.zone_bitmap = zone_bitmap;
                 portEXIT_CRITICAL(&s_lock);
 
@@ -244,7 +246,7 @@ esp_err_t ld2450_init(const ld2450_config_t *cfg)
     ESP_ERROR_CHECK(uart_driver_install(
         s_uart_num,
         cfg->rx_buf_size > 0 ? cfg->rx_buf_size : 2048,
-        0,      // no TX buffer
+        256,    // TX buffer for sending commands to sensor
         0, NULL,
         0
     ));
@@ -334,6 +336,11 @@ esp_err_t ld2450_set_zones(const ld2450_zone_t *zones, size_t count)
     memcpy(s_zones, zones, sizeof(s_zones));
     portEXIT_CRITICAL(&s_lock);
     return ESP_OK;
+}
+
+uart_port_t ld2450_get_uart_port(void)
+{
+    return s_uart_num;
 }
 
 esp_err_t ld2450_set_zone(size_t zone_index, const ld2450_zone_t *zone)

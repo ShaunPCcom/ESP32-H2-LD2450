@@ -4,6 +4,7 @@ idf_component_register(
         "ld2450_cli.c"
         "zigbee_app.c"
         "board_led.c"
+        "nvs_config.c"
     INCLUDE_DIRS
         "."
     PRIV_REQUIRES

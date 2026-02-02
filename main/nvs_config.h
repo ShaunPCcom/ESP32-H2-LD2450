@@ -1,0 +1,41 @@
+#pragma once
+
+#include "esp_err.h"
+#include "ld2450.h"
+#include "ld2450_zone.h"
+#include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * Persistent configuration stored in NVS.
+ * All fields have sensible defaults if NVS is empty.
+ */
+typedef struct {
+    /* Software config */
+    uint8_t tracking_mode;      /* 0=multi, 1=single */
+    uint8_t publish_coords;     /* 0=off, 1=on */
+
+    /* Sensor hardware config (applied via LD2450 commands) */
+    uint16_t max_distance_mm;   /* 0-6000 */
+    uint8_t angle_left_deg;     /* 0-90 */
+    uint8_t angle_right_deg;    /* 0-90 */
+    uint8_t bt_disabled;        /* 0=BT on, 1=BT off */
+
+    /* Zones */
+    ld2450_zone_t zones[5];
+} nvs_config_t;
+
+/** Initialize NVS config module and load saved config (or defaults). */
+esp_err_t nvs_config_init(void);
+
+/** Get a copy of the current loaded config. */
+esp_err_t nvs_config_get(nvs_config_t *out);
+
+/* Per-field save functions. Each updates the in-memory copy and writes to NVS. */
+esp_err_t nvs_config_save_tracking_mode(uint8_t mode);
+esp_err_t nvs_config_save_publish_coords(uint8_t enabled);
+esp_err_t nvs_config_save_max_distance(uint16_t mm);
+esp_err_t nvs_config_save_angle_left(uint8_t deg);
+esp_err_t nvs_config_save_angle_right(uint8_t deg);
+esp_err_t nvs_config_save_bt_disabled(uint8_t disabled);
+esp_err_t nvs_config_save_zone(uint8_t zone_index, const ld2450_zone_t *zone);
