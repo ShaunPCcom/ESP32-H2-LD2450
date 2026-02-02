@@ -9,11 +9,14 @@
 #include "ld2450_cli.h"
 #include "sdkconfig.h"
 #include "zigbee_app.h"
+#include "board_led.h"
 
 static const char *TAG = "ld2450_hwtest";
 
 void app_main(void)
 {
+    board_led_init();
+    board_led_set_state(BOARD_LED_BOOT);
     ESP_LOGI(TAG, "Zigbee role: %s", CONFIG_LD2450_ZB_ROUTER ? "router" : "end device");
 
     esp_err_t err = nvs_flash_init();

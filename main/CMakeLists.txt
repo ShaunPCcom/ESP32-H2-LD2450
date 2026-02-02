@@ -4,6 +4,7 @@ idf_component_register(
         "ld2450_cli.c"
         "zigbee_app.c"
         "zgp_stub.c"
+        "board_led.c"
     INCLUDE_DIRS
         "."
     PRIV_REQUIRES
@@ -12,6 +13,7 @@ idf_component_register(
         ld2450
         espressif__esp-zigbee-lib
         espressif__esp-zboss-lib
+        led_strip
     WHOLE_ARCHIVE
 )
 

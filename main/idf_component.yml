@@ -15,6 +15,5 @@ dependencies:
   #   # All dependencies of `main` are public by default.
   #   public: true
   espressif/esp-zigbee-lib: ^1.6.4
-
-
   espressif/esp-zboss-lib: '*'
+  led_strip: "*"
