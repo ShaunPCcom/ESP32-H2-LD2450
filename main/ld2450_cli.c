@@ -17,6 +17,7 @@
 #include "ld2450.h"
 #include "ld2450_cmd.h"
 #include "nvs_config.h"
+#include "zigbee_app.h"
 
 static const char *TAG = "ld2450_cli";
 
@@ -43,7 +44,8 @@ static void print_help(void)
         "  ld bt <on|off>\n"
         "  ld coords <on|off>\n"
         "  ld config\n"
-        "  ld reboot\n\n"
+        "  ld reboot\n"
+        "  ld factory-reset             (erase Zigbee network, re-pair)\n\n"
     );
 }
 
@@ -295,6 +297,13 @@ static void cli_task(void *arg)
 
 zone_done:
                 continue;
+            }
+
+            if (strcmp(cmd, "factory-reset") == 0) {
+                printf("Erasing Zigbee network data and restarting...\n");
+                fflush(stdout);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                zigbee_factory_reset();
             }
 
             if (strcmp(cmd, "reboot") == 0) {

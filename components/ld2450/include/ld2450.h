@@ -70,3 +70,8 @@ esp_err_t ld2450_set_zone(size_t zone_index, const ld2450_zone_t *zone);
 
 // Access UART port (for command module)
 uart_port_t ld2450_get_uart_port(void);
+
+// Pause/resume the RX task so command module gets exclusive UART access.
+// Must be called in pairs. Blocks until the RX task yields.
+void ld2450_rx_pause(void);
+void ld2450_rx_resume(void);

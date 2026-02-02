@@ -121,14 +121,18 @@ static esp_err_t exit_config(void)
     return read_ack(CMD_DISABLE_CONF);
 }
 
-/* Send a command wrapped in enter/exit config. */
+/* Send a command wrapped in enter/exit config.
+ * Pauses the RX task so we have exclusive UART access for ACK reads. */
 static esp_err_t send_config_command(uint8_t cmd_id, const uint8_t *value, uint16_t value_len)
 {
     esp_err_t err;
 
+    ld2450_rx_pause();
+
     err = enter_config();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to enter config mode");
+        ld2450_rx_resume();
         return err;
     }
 
@@ -137,6 +141,7 @@ static esp_err_t send_config_command(uint8_t cmd_id, const uint8_t *value, uint1
     err = send_frame(cmd_id, value, value_len);
     if (err != ESP_OK) {
         exit_config();
+        ld2450_rx_resume();
         return err;
     }
 
@@ -144,12 +149,14 @@ static esp_err_t send_config_command(uint8_t cmd_id, const uint8_t *value, uint1
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Command 0x%02X ACK failed", cmd_id);
         exit_config();
+        ld2450_rx_resume();
         return err;
     }
 
     vTaskDelay(pdMS_TO_TICKS(CMD_DELAY_MS));
 
     exit_config();
+    ld2450_rx_resume();
     return ESP_OK;
 }
 

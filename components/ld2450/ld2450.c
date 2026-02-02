@@ -30,6 +30,8 @@ static const char *TAG = "ld2450";
 
 static TaskHandle_t s_uart_task = NULL;
 static uart_port_t s_uart_num = UART_NUM_MAX;
+static volatile bool s_rx_pause_requested = false;
+static SemaphoreHandle_t s_rx_paused_sem = NULL;  // signaled when RX task has paused
 
 // Protects s_zones, runtime cfg, and state snapshots
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -115,8 +117,15 @@ static void ld2450_uart_task(void *arg)
     bool have_last = false;
 
     while (1) {
-        // Block up to 1s waiting for data
-        int n = uart_read_bytes(s_uart_num, buf, buf_len, pdMS_TO_TICKS(1000));
+        // If command module requested pause, yield until resumed
+        if (s_rx_pause_requested) {
+            xSemaphoreGive(s_rx_paused_sem);  // signal "I'm paused"
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // block until resumed
+            continue;
+        }
+
+        // Block up to 100ms waiting for data (short so pause requests aren't delayed)
+        int n = uart_read_bytes(s_uart_num, buf, buf_len, pdMS_TO_TICKS(100));
         if (n > 0) {
             if (ld2450_parser_feed(parser, buf, (size_t)n)) {
                 const ld2450_report_t *r = ld2450_parser_get_report(parser);
@@ -256,6 +265,9 @@ esp_err_t ld2450_init(const ld2450_config_t *cfg)
     ESP_LOGI(TAG, "Configured UART%d: baud=%d tx=%d rx=%d",
              (int)s_uart_num, cfg->baud_rate, cfg->tx_gpio, cfg->rx_gpio);
 
+    s_rx_paused_sem = xSemaphoreCreateBinary();
+    if (!s_rx_paused_sem) return ESP_ERR_NO_MEM;
+
     BaseType_t ok = xTaskCreate(ld2450_uart_task, "ld2450_uart", 4096, NULL, 10, &s_uart_task);
     if (ok != pdPASS) {
         s_uart_task = NULL;
@@ -268,6 +280,21 @@ esp_err_t ld2450_init(const ld2450_config_t *cfg)
 bool ld2450_is_running(void)
 {
     return s_uart_task != NULL;
+}
+
+void ld2450_rx_pause(void)
+{
+    if (!s_uart_task) return;
+    s_rx_pause_requested = true;
+    // Wait for the RX task to actually pause (up to 200ms for current read to finish)
+    xSemaphoreTake(s_rx_paused_sem, pdMS_TO_TICKS(200));
+}
+
+void ld2450_rx_resume(void)
+{
+    if (!s_uart_task) return;
+    s_rx_pause_requested = false;
+    xTaskNotifyGive(s_uart_task);  // wake the RX task
 }
 
 esp_err_t ld2450_get_runtime_cfg(ld2450_runtime_cfg_t *out)

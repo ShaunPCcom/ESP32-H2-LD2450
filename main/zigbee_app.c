@@ -15,6 +15,7 @@
 #include "zcl/esp_zigbee_zcl_common.h"
 
 /* Project */
+#include "board_config.h"
 #include "board_led.h"
 #include "ld2450.h"
 #include "ld2450_cmd.h"
@@ -575,8 +576,65 @@ static void zigbee_task(void *pv)
     esp_zb_stack_main_loop();
 }
 
+/* ================================================================== */
+/*  Factory reset (callable from any context)                          */
+/* ================================================================== */
+
+void zigbee_factory_reset(void)
+{
+    ESP_LOGW(TAG, "Zigbee factory reset - erasing network data and restarting");
+    board_led_set_state(BOARD_LED_ERROR);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_zb_factory_reset();
+    /* esp_zb_factory_reset() restarts, but just in case: */
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_restart();
+}
+
+/* ================================================================== */
+/*  Boot button monitor (GPIO9, active-low, hold 3s = factory reset)   */
+/* ================================================================== */
+
+static void button_task(void *pv)
+{
+    (void)pv;
+
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << BOARD_BUTTON_GPIO),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io_conf);
+
+    uint32_t held_ms = 0;
+
+    while (1) {
+        if (gpio_get_level(BOARD_BUTTON_GPIO) == 0) {
+            held_ms += 100;
+            if (held_ms == 1000) {
+                /* Visual feedback: fast red blink while holding */
+                board_led_set_state(BOARD_LED_ERROR);
+            }
+            if (held_ms >= BOARD_BUTTON_HOLD_MS) {
+                zigbee_factory_reset();
+            }
+        } else {
+            if (held_ms >= 1000) {
+                /* Released early - restore LED to current network state */
+                board_led_set_state(s_network_joined
+                    ? BOARD_LED_JOINED : BOARD_LED_NOT_JOINED);
+            }
+            held_ms = 0;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
 void zigbee_app_start(void)
 {
     ESP_LOGI(TAG, "Starting Zigbee task...");
     xTaskCreate(zigbee_task, "zb_task", 8192, NULL, 5, NULL);
+    xTaskCreate(button_task, "btn_task", 2048, NULL, 5, NULL);
 }
