@@ -3,7 +3,6 @@ idf_component_register(
         "ld2450_zb_h2.c"
         "ld2450_cli.c"
         "zigbee_app.c"
-        "zgp_stub.c"
         "board_led.c"
     INCLUDE_DIRS
         "."
