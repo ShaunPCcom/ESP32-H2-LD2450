@@ -214,7 +214,7 @@ const exposesDefinition = [
 
     ...Array.from({length: 5}, (_, i) =>
         binaryExpose(`zone_${i + 1}_occupancy`, `Zone ${i + 1} occupancy`, ACCESS_STATE, true, false,
-            `Presence detected in zone ${i + 1}`, 'occupancy')
+            `Presence detected in zone ${i + 1}`)
     ),
 
     numericExpose('target_count', 'Target count', ACCESS_STATE,
@@ -246,10 +246,12 @@ const exposesDefinition = [
         'Restart the device'),
 
     ...Array.from({length: 5}, (_, z) =>
-        ZONE_COORD_NAMES.map(c =>
-            numericExpose(`zone_${z + 1}_${c}`, `Zone ${z + 1} ${c}`, ACCESS_ALL,
-                `Zone ${z + 1} vertex ${c}`, {unit: 'mm', value_min: -6000, value_max: 6000, value_step: 1})
-        )
+        ZONE_COORD_NAMES.map(c => {
+            const axis = c[0].toUpperCase();
+            const point = c[1];
+            return numericExpose(`zone_${z + 1}_${c}`, `Zone ${z + 1} - Point ${point} ${axis}`, ACCESS_ALL,
+                `Zone ${z + 1} point ${point} ${axis} coordinate`, {unit: 'mm', value_min: -6000, value_max: 6000, value_step: 1});
+        })
     ).flat(),
 ];
 
@@ -263,6 +265,13 @@ const definition = {
     fromZigbee: [fzLocal.occupancy, fzLocal.config, fzLocal.zone_vertices],
     toZigbee: [tzLocal.config, tzLocal.restart, tzLocal.zone_vertices],
     exposes: exposesDefinition,
+    meta: {
+        overrideHaDiscoveryPayload: (payload) => {
+            if (payload.object_id && payload.object_id.endsWith('_occupancy')) {
+                payload.device_class = 'occupancy';
+            }
+        },
+    },
     onEvent: async (type, data, device) => {
         if (type === 'start' || type === 'deviceInterview') {
             registerCustomClusters(device);
