@@ -100,7 +100,7 @@ const fzLocal = {
             if (d.angleLeft !== undefined) result.angle_left = d.angleLeft;
             if (d.angleRight !== undefined) result.angle_right = d.angleRight;
             if (d.trackingMode !== undefined) {
-                result.tracking_mode = d.trackingMode === 1 ? 'single' : 'multi';
+                result.tracking_mode = d.trackingMode === 0;
             }
             if (d.coordPublishing !== undefined) {
                 result.coord_publishing = d.coordPublishing === 1;
@@ -154,7 +154,7 @@ const tzLocal = {
                 max_distance:     {attr: 'maxDistance',      val: (v) => Math.round(v * 1000)},
                 angle_left:       {attr: 'angleLeft',       val: (v) => v},
                 angle_right:      {attr: 'angleRight',      val: (v) => v},
-                tracking_mode:    {attr: 'trackingMode',    val: (v) => v === 'single' ? 1 : 0},
+                tracking_mode:    {attr: 'trackingMode',    val: (v) => v ? 0 : 1},
                 coord_publishing: {attr: 'coordPublishing', val: (v) => v ? 1 : 0},
             };
             const m = map[key];
@@ -236,8 +236,8 @@ const exposesDefinition = [
     numericExpose('angle_right', 'Angle right', ACCESS_ALL,
         'Right angle limit of detection zone', {unit: '°', value_min: 0, value_max: 90, value_step: 1}),
 
-    enumExpose('tracking_mode', 'Tracking mode', ACCESS_ALL, ['multi', 'single'],
-        'Multi-target or single-target tracking'),
+    binaryExpose('tracking_mode', 'Multi target', ACCESS_ALL, true, false,
+        'Multi-target tracking (off = single target)'),
 
     binaryExpose('coord_publishing', 'Coordinate publishing', ACCESS_ALL, true, false,
         'Enable publishing of target coordinates'),
