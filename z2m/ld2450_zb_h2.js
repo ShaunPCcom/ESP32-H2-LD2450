@@ -96,7 +96,7 @@ const fzLocal = {
             const d = msg.data;
 
             if (d.targetCount !== undefined) result.target_count = d.targetCount;
-            if (d.maxDistance !== undefined) result.max_distance = d.maxDistance;
+            if (d.maxDistance !== undefined) result.max_distance = d.maxDistance / 1000;
             if (d.angleLeft !== undefined) result.angle_left = d.angleLeft;
             if (d.angleRight !== undefined) result.angle_right = d.angleRight;
             if (d.trackingMode !== undefined) {
@@ -112,8 +112,8 @@ const fzLocal = {
                 for (let i = 0; i < 3; i++) {
                     if (i < parts.length) {
                         const [x, y] = parts[i].split(',').map(Number);
-                        result[`target_${i + 1}_x`] = isNaN(x) ? 0 : x;
-                        result[`target_${i + 1}_y`] = isNaN(y) ? 0 : y;
+                        result[`target_${i + 1}_x`] = isNaN(x) ? 0 : x / 1000;
+                        result[`target_${i + 1}_y`] = isNaN(y) ? 0 : y / 1000;
                     } else {
                         result[`target_${i + 1}_x`] = 0;
                         result[`target_${i + 1}_y`] = 0;
@@ -134,7 +134,7 @@ const fzLocal = {
             const result = {};
             for (let i = 0; i < 8; i++) {
                 if (msg.data[ZONE_ATTR_NAMES[i]] !== undefined) {
-                    result[`zone_${zone}_${ZONE_COORD_NAMES[i]}`] = msg.data[ZONE_ATTR_NAMES[i]];
+                    result[`zone_${zone}_${ZONE_COORD_NAMES[i]}`] = msg.data[ZONE_ATTR_NAMES[i]] / 1000;
                 }
             }
             return result;
@@ -151,7 +151,7 @@ const tzLocal = {
             registerCustomClusters(meta.device);
             const ep = meta.device.getEndpoint(1);
             const map = {
-                max_distance:     {attr: 'maxDistance',      val: (v) => v},
+                max_distance:     {attr: 'maxDistance',      val: (v) => Math.round(v * 1000)},
                 angle_left:       {attr: 'angleLeft',       val: (v) => v},
                 angle_right:      {attr: 'angleRight',      val: (v) => v},
                 tracking_mode:    {attr: 'trackingMode',    val: (v) => v === 'single' ? 1 : 0},
@@ -193,7 +193,7 @@ const tzLocal = {
             const zone = parseInt(m[1]);
             const attrIdx = (parseInt(m[3]) - 1) * 2 + (m[2] === 'y' ? 1 : 0);
             const ep = meta.device.getEndpoint(zone + 1);
-            await ep.write('ld2450Zone', {[ZONE_ATTR_NAMES[attrIdx]]: value});
+            await ep.write('ld2450Zone', {[ZONE_ATTR_NAMES[attrIdx]]: Math.round(value * 1000)});
             return {state: {[key]: value}};
         },
         convertGet: async (entity, key, meta) => {
@@ -222,13 +222,13 @@ const exposesDefinition = [
 
     ...Array.from({length: 3}, (_, i) => [
         numericExpose(`target_${i + 1}_x`, `Target ${i + 1} X`, ACCESS_STATE,
-            `Target ${i + 1} X coordinate`, {unit: 'mm'}),
+            `Target ${i + 1} X coordinate`, {unit: 'm'}),
         numericExpose(`target_${i + 1}_y`, `Target ${i + 1} Y`, ACCESS_STATE,
-            `Target ${i + 1} Y coordinate`, {unit: 'mm'}),
+            `Target ${i + 1} Y coordinate`, {unit: 'm'}),
     ]).flat(),
 
     numericExpose('max_distance', 'Max distance', ACCESS_ALL,
-        'Maximum detection distance', {unit: 'mm', value_min: 0, value_max: 6000, value_step: 1}),
+        'Maximum detection distance', {unit: 'm', value_min: 0, value_max: 6, value_step: 0.01}),
 
     numericExpose('angle_left', 'Angle left', ACCESS_ALL,
         'Left angle limit of detection zone', {unit: '°', value_min: 0, value_max: 90, value_step: 1}),
@@ -250,7 +250,7 @@ const exposesDefinition = [
             const axis = c[0].toUpperCase();
             const point = c[1];
             return numericExpose(`zone_${z + 1}_${c}`, `Zone ${z + 1} - Point ${point} ${axis}`, ACCESS_ALL,
-                `Zone ${z + 1} point ${point} ${axis} coordinate`, {unit: 'mm', value_min: -6000, value_max: 6000, value_step: 1});
+                `Zone ${z + 1} point ${point} ${axis} coordinate`, {unit: 'm', value_min: -6, value_max: 6, value_step: 0.01});
         })
     ).flat(),
 ];
