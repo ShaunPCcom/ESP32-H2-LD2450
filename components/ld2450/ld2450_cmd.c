@@ -24,7 +24,7 @@ static const uint8_t CMD_FOOTER[4] = {0x04, 0x03, 0x02, 0x01};
 #define CMD_FACTORY_RESET 0xA2
 #define CMD_SET_ZONE      0xC2
 
-#define ACK_TIMEOUT_MS    200
+#define ACK_TIMEOUT_MS    500
 #define CMD_DELAY_MS       50
 #define MAX_FRAME_SIZE     64
 
@@ -56,6 +56,9 @@ static esp_err_t send_frame(uint8_t cmd_id, const uint8_t *value, uint16_t value
     /* Footer */
     memcpy(&frame[pos], CMD_FOOTER, 4); pos += 4;
 
+    /* Flush stale data frames before sending so read_ack scans less junk */
+    uart_flush_input(port);
+
     int written = uart_write_bytes(port, (const char *)frame, pos);
     if (written != (int)pos) {
         ESP_LOGE(TAG, "UART write failed: wrote %d/%d", written, (int)pos);
@@ -65,38 +68,59 @@ static esp_err_t send_frame(uint8_t cmd_id, const uint8_t *value, uint16_t value
     return ESP_OK;
 }
 
-/* Read ACK from sensor. Returns ESP_OK if ACK status == success. */
+/* Scan UART for ACK frame, skipping interleaved data frames.
+ * Data frames start with AA FF 03 00, ACK frames with FD FC FB FA.
+ * Returns ESP_OK if ACK status == success. */
 static esp_err_t read_ack(uint8_t expected_cmd)
 {
     uart_port_t port = ld2450_get_uart_port();
-    uint8_t buf[32];
+    uint8_t buf[64];
+    int hdr_matched = 0;   /* how many ACK header bytes matched so far */
+    int ack_pos = 0;       /* bytes collected after header match */
+    uint8_t ack[16];       /* ACK payload: length(2) + cmd(2) + status(2) + footer(4) */
+    const int ack_need = 10; /* minimum bytes after header: len(2)+cmd(2)+status(2)+footer(4) */
+    TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(ACK_TIMEOUT_MS);
 
-    /* Flush any pending data output frames first */
-    uart_flush_input(port);
+    int total_read = 0;
+    while (xTaskGetTickCount() < deadline) {
+        TickType_t remaining = deadline - xTaskGetTickCount();
+        int n = uart_read_bytes(port, buf, sizeof(buf), remaining);
+        if (n <= 0) continue;
+        total_read += n;
 
-    int n = uart_read_bytes(port, buf, sizeof(buf), pdMS_TO_TICKS(ACK_TIMEOUT_MS));
-    if (n < 12) {
-        ESP_LOGW(TAG, "ACK timeout or short read (%d bytes) for cmd 0x%02X", n, expected_cmd);
-        return ESP_ERR_TIMEOUT;
+        for (int i = 0; i < n; i++) {
+            if (hdr_matched < 4) {
+                /* Scanning for ACK header FD FC FB FA */
+                if (buf[i] == CMD_HEADER[hdr_matched]) {
+                    hdr_matched++;
+                } else {
+                    hdr_matched = (buf[i] == CMD_HEADER[0]) ? 1 : 0;
+                }
+            } else {
+                /* Collecting ACK body after header */
+                ack[ack_pos++] = buf[i];
+                if (ack_pos >= ack_need) goto got_ack;
+            }
+        }
     }
 
-    /* Verify header */
-    if (memcmp(buf, CMD_HEADER, 4) != 0) {
-        ESP_LOGW(TAG, "ACK bad header for cmd 0x%02X", expected_cmd);
-        return ESP_ERR_INVALID_RESPONSE;
-    }
+    ESP_LOGW(TAG, "ACK timeout for cmd 0x%02X (%d bytes read, no ACK header found)",
+             expected_cmd, total_read);
+    return ESP_ERR_TIMEOUT;
 
-    /* Verify ACK command word: should be (expected_cmd, 0x01) */
-    if (buf[6] != expected_cmd || buf[7] != 0x01) {
+got_ack:
+    /* ack[0..1] = intra-frame length (LE), ack[2] = cmd echo, ack[3] = 0x01,
+     * ack[4..5] = status, ack[6..9] = footer */
+
+    if (ack[2] != expected_cmd || ack[3] != 0x01) {
         ESP_LOGW(TAG, "ACK unexpected cmd word: 0x%02X 0x%02X (expected 0x%02X 0x01)",
-                 buf[6], buf[7], expected_cmd);
+                 ack[2], ack[3], expected_cmd);
         return ESP_ERR_INVALID_RESPONSE;
     }
 
-    /* Check status bytes */
-    if (buf[8] != 0x00 || buf[9] != 0x00) {
+    if (ack[4] != 0x00 || ack[5] != 0x00) {
         ESP_LOGW(TAG, "ACK failure status for cmd 0x%02X: 0x%02X%02X",
-                 expected_cmd, buf[8], buf[9]);
+                 expected_cmd, ack[4], ack[5]);
         return ESP_FAIL;
     }
 
