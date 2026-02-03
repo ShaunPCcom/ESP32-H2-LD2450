@@ -25,7 +25,7 @@
 static const char *TAG = "zigbee";
 
 /* Sensor poll interval (ms) */
-#define SENSOR_POLL_INTERVAL_MS  500
+#define SENSOR_POLL_INTERVAL_MS  250
 
 /* Reporting intervals (seconds) */
 #define REPORT_MIN_INTERVAL   0
