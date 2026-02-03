@@ -56,8 +56,9 @@ function registerCustomClusters(device) {
 
 // ---- Expose helpers (inline, no require) ----
 
-function binaryExpose(name, label, access, valueOn, valueOff, description) {
-    return {type: 'binary', name, label, property: name, access, value_on: valueOn, value_off: valueOff, description};
+function binaryExpose(property, label, access, valueOn, valueOff, description, name) {
+    return {type: 'binary', name: name || property, label, property, access,
+        value_on: valueOn, value_off: valueOff, description};
 }
 
 function numericExpose(name, label, access, description, opts) {
@@ -213,7 +214,7 @@ const exposesDefinition = [
 
     ...Array.from({length: 5}, (_, i) =>
         binaryExpose(`zone_${i + 1}_occupancy`, `Zone ${i + 1} occupancy`, ACCESS_STATE, true, false,
-            `Presence detected in zone ${i + 1}`)
+            `Presence detected in zone ${i + 1}`, 'occupancy')
     ),
 
     numericExpose('target_count', 'Target count', ACCESS_STATE,

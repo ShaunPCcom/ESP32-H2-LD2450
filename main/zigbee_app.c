@@ -294,8 +294,10 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
             return ESP_OK;
         }
         case ZB_ATTR_RESTART:
-            ESP_LOGI(TAG, "Restart requested via Zigbee");
-            esp_restart();
+            ESP_LOGI(TAG, "Restart requested via Zigbee, restarting in 1s...");
+            /* Delay so the ZCL Write Attributes Response is sent before we reset.
+             * Without this, Z2M retries the write after reconnect → double reboot. */
+            esp_zb_scheduler_alarm((esp_zb_callback_t)esp_restart, 0, 1000);
             return ESP_OK;
         default:
             break;
