@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "ld2450_zone.h"
 
 static bool point_on_segment(ld2450_point_t p, ld2450_point_t a, ld2450_point_t b)

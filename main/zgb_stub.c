@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "sdkconfig.h"
 
 #if !CONFIG_ZB_GP_ENABLED

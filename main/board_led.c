@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "board_led.h"
 
 #include "led_strip.h"

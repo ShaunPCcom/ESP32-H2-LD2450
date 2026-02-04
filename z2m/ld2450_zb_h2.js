@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 'use strict';
 
 // Zigbee2MQTT external converter for LD2450-ZB-H2 mmWave presence sensor.

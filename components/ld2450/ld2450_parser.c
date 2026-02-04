@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "ld2450_parser.h"
 
 #include <stdlib.h>

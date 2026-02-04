@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #pragma once
 #include "driver/gpio.h"
 #include "driver/uart.h"
