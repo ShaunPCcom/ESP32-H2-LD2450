@@ -413,7 +413,7 @@ static void sensor_poll_cb(uint8_t param)
             ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
             ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
             ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
-            &val, true);  /* Immediate report for occupancy changes */
+            &val, false);
         s_last_occupied = occupied;
     }
 
@@ -425,7 +425,7 @@ static void sensor_poll_cb(uint8_t param)
                 ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
                 ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
                 ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
-                &val, true);  /* Immediate report for occupancy changes */
+                &val, false);
             s_last_zone_occ[i] = state.zone_occupied[i];
         }
     }
