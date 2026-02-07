@@ -15,6 +15,9 @@
 
 #include "driver/uart.h"
 
+#include "nvs_flash.h"
+#include "nvs.h"
+
 #include "ld2450.h"
 #include "ld2450_cmd.h"
 #include "nvs_config.h"
@@ -45,6 +48,7 @@ static void print_help(void)
         "  ld bt <on|off>\n"
         "  ld coords <on|off>\n"
         "  ld config\n"
+        "  ld nvs                       (test NVS health)\n"
         "  ld reboot\n"
         "  ld factory-reset             (erase Zigbee network, re-pair)\n\n"
     );
@@ -247,8 +251,12 @@ static void cli_task(void *arg)
                 if (strcmp(onoff, "off") == 0) {
                     z.enabled = false;
                     if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {
-                        nvs_config_save_zone((uint8_t)zi, &z);
-                        printf("zone%d disabled (saved)\n", zi + 1);
+                        esp_err_t err = nvs_config_save_zone((uint8_t)zi, &z);
+                        if (err == ESP_OK) {
+                            printf("zone%d disabled (saved)\n", zi + 1);
+                        } else {
+                            printf("zone%d disabled BUT NVS SAVE FAILED: %s\n", zi + 1, esp_err_to_name(err));
+                        }
                     } else {
                         printf("zone%d update failed\n", zi + 1);
                     }
@@ -267,8 +275,12 @@ static void cli_task(void *arg)
 
                 if (!coords[0]) {
                     if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {
-                        nvs_config_save_zone((uint8_t)zi, &z);
-                        printf("zone%d enabled (saved)\n", zi + 1);
+                        esp_err_t err = nvs_config_save_zone((uint8_t)zi, &z);
+                        if (err == ESP_OK) {
+                            printf("zone%d enabled (saved)\n", zi + 1);
+                        } else {
+                            printf("zone%d enabled BUT NVS SAVE FAILED: %s\n", zi + 1, esp_err_to_name(err));
+                        }
                     } else {
                         printf("zone%d update failed\n", zi + 1);
                     }
@@ -290,13 +302,73 @@ static void cli_task(void *arg)
                 }
 
                 if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {
-                    nvs_config_save_zone((uint8_t)zi, &z);
-                    printf("zone%d set (saved)\n", zi + 1);
+                    esp_err_t err = nvs_config_save_zone((uint8_t)zi, &z);
+                    if (err == ESP_OK) {
+                        printf("zone%d set (saved)\n", zi + 1);
+                    } else {
+                        printf("zone%d set BUT NVS SAVE FAILED: %s\n", zi + 1, esp_err_to_name(err));
+                    }
                 } else {
                     printf("zone%d update failed\n", zi + 1);
                 }
 
 zone_done:
+                continue;
+            }
+
+            if (strcmp(cmd, "nvs") == 0) {
+                printf("=== NVS Health Check ===\n");
+
+                /* Get NVS stats */
+                nvs_stats_t nvs_stats;
+                esp_err_t err = nvs_get_stats(NULL, &nvs_stats);
+                if (err == ESP_OK) {
+                    printf("NVS partition stats:\n");
+                    printf("  Used entries:  %zu\n", nvs_stats.used_entries);
+                    printf("  Free entries:  %zu\n", nvs_stats.free_entries);
+                    printf("  Total entries: %zu\n", nvs_stats.total_entries);
+                    printf("  Namespace count: %zu\n", nvs_stats.namespace_count);
+                } else {
+                    printf("Failed to get NVS stats: %s\n", esp_err_to_name(err));
+                }
+
+                /* Test write/read */
+                printf("\nTesting NVS write/read...\n");
+                nvs_handle_t h;
+                err = nvs_open("ld2450_cfg", NVS_READWRITE, &h);
+                if (err != ESP_OK) {
+                    printf("  nvs_open FAILED: %s\n", esp_err_to_name(err));
+                    continue;
+                }
+
+                uint32_t test_val = 0xDEADBEEF;
+                err = nvs_set_u32(h, "nvs_test", test_val);
+                if (err != ESP_OK) {
+                    printf("  nvs_set_u32 FAILED: %s\n", esp_err_to_name(err));
+                    nvs_close(h);
+                    continue;
+                }
+
+                err = nvs_commit(h);
+                if (err != ESP_OK) {
+                    printf("  nvs_commit FAILED: %s\n", esp_err_to_name(err));
+                    nvs_close(h);
+                    continue;
+                }
+
+                uint32_t read_val = 0;
+                err = nvs_get_u32(h, "nvs_test", &read_val);
+                nvs_close(h);
+
+                if (err != ESP_OK) {
+                    printf("  nvs_get_u32 FAILED: %s\n", esp_err_to_name(err));
+                } else if (read_val != test_val) {
+                    printf("  Data mismatch! Wrote 0x%08X, read 0x%08X\n", (unsigned int)test_val, (unsigned int)read_val);
+                    printf("  NVS CORRUPTION DETECTED!\n");
+                } else {
+                    printf("  Write/read test PASSED (0x%08X)\n", (unsigned int)test_val);
+                }
+
                 continue;
             }
 

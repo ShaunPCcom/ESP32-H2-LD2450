@@ -168,8 +168,14 @@ ld bt off
 # View current config
 ld config
 
+# Test NVS health (diagnostics)
+ld nvs
+
 # Restart device
 ld reboot
+
+# Factory reset (erase Zigbee network and re-pair)
+ld factory-reset
 ```
 
 **Note**: CLI changes are immediately saved to NVS and persist across reboots.

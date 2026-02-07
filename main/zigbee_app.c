@@ -255,43 +255,58 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
         switch (attr_id) {
         case ZB_ATTR_MAX_DISTANCE: {
             uint16_t dist = *(uint16_t *)val;
-            nvs_config_save_max_distance(dist);
+            esp_err_t err = nvs_config_save_max_distance(dist);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save max_distance to NVS: %s", esp_err_to_name(err));
+            }
             nvs_config_t cfg;
             nvs_config_get(&cfg);
             ld2450_cmd_apply_distance_angle(cfg.max_distance_mm, cfg.angle_left_deg, cfg.angle_right_deg);
-            ESP_LOGI(TAG, "Max distance -> %u mm", dist);
+            ESP_LOGI(TAG, "Max distance -> %u mm%s", dist, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
             return ESP_OK;
         }
         case ZB_ATTR_ANGLE_LEFT: {
             uint8_t deg = *(uint8_t *)val;
-            nvs_config_save_angle_left(deg);
+            esp_err_t err = nvs_config_save_angle_left(deg);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save angle_left to NVS: %s", esp_err_to_name(err));
+            }
             nvs_config_t cfg;
             nvs_config_get(&cfg);
             ld2450_cmd_apply_distance_angle(cfg.max_distance_mm, cfg.angle_left_deg, cfg.angle_right_deg);
-            ESP_LOGI(TAG, "Angle left -> %u", deg);
+            ESP_LOGI(TAG, "Angle left -> %u%s", deg, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
             return ESP_OK;
         }
         case ZB_ATTR_ANGLE_RIGHT: {
             uint8_t deg = *(uint8_t *)val;
-            nvs_config_save_angle_right(deg);
+            esp_err_t err = nvs_config_save_angle_right(deg);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save angle_right to NVS: %s", esp_err_to_name(err));
+            }
             nvs_config_t cfg;
             nvs_config_get(&cfg);
             ld2450_cmd_apply_distance_angle(cfg.max_distance_mm, cfg.angle_left_deg, cfg.angle_right_deg);
-            ESP_LOGI(TAG, "Angle right -> %u", deg);
+            ESP_LOGI(TAG, "Angle right -> %u%s", deg, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
             return ESP_OK;
         }
         case ZB_ATTR_TRACKING_MODE: {
             uint8_t mode = *(uint8_t *)val;
             ld2450_set_tracking_mode(mode ? LD2450_TRACK_SINGLE : LD2450_TRACK_MULTI);
-            nvs_config_save_tracking_mode(mode);
-            ESP_LOGI(TAG, "Tracking mode -> %s", mode ? "single" : "multi");
+            esp_err_t err = nvs_config_save_tracking_mode(mode);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save tracking_mode to NVS: %s", esp_err_to_name(err));
+            }
+            ESP_LOGI(TAG, "Tracking mode -> %s%s", mode ? "single" : "multi", (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
             return ESP_OK;
         }
         case ZB_ATTR_COORD_PUBLISHING: {
             uint8_t en = *(uint8_t *)val;
             ld2450_set_publish_coords(en != 0);
-            nvs_config_save_publish_coords(en);
-            ESP_LOGI(TAG, "Coord publishing -> %s", en ? "on" : "off");
+            esp_err_t err = nvs_config_save_publish_coords(en);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save publish_coords to NVS: %s", esp_err_to_name(err));
+            }
+            ESP_LOGI(TAG, "Coord publishing -> %s%s", en ? "on" : "off", (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
             return ESP_OK;
         }
         case ZB_ATTR_RESTART:
@@ -326,9 +341,12 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
         zones[zone_idx].enabled = true;
 
         ld2450_set_zone(zone_idx, &zones[zone_idx]);
-        nvs_config_save_zone(zone_idx, &zones[zone_idx]);
-
-        ESP_LOGI(TAG, "Zone %d vertex attr 0x%04X -> %d", zone_idx + 1, attr_id, coord_val);
+        esp_err_t err = nvs_config_save_zone(zone_idx, &zones[zone_idx]);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to save zone %d to NVS: %s", zone_idx + 1, esp_err_to_name(err));
+        } else {
+            ESP_LOGI(TAG, "Zone %d vertex attr 0x%04X -> %d (saved to NVS)", zone_idx + 1, attr_id, coord_val);
+        }
         return ESP_OK;
     }
 
