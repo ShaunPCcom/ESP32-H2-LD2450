@@ -66,7 +66,7 @@ This Zigbee implementation offers different trade-offs compared to ESPHome-based
 |--------------|------------|----------|
 | GPIO12       | RX         | ESP32 TX → LD2450 RX (commands) |
 | GPIO22       | TX         | ESP32 RX ← LD2450 TX (data) |
-| GPIO8        | -          | WS2812 RGB LED (optional) |
+| GPIO8        | -          | Status LED (built-in on most DevKits) |
 | GPIO9        | -          | BOOT button (factory reset) |
 | 5V           | 5V         | Power |
 | GND          | GND        | Ground |
@@ -74,7 +74,7 @@ This Zigbee implementation offers different trade-offs compared to ESPHome-based
 **Notes**:
 - UART baud rate: 256000
 - GPIO9 is the ESP32-H2 DevKit BOOT button (active-low, internal pull-up)
-- WS2812 LED is optional but recommended for status indication
+- **GPIO8 Status LED**: Many ESP32-H2 development boards (such as the ESP32-H2-DevKitM-1) include a built-in addressable RGB LED on GPIO8. The firmware uses the ESP-IDF `led_strip` driver to display color-coded status. If your board has a simple (non-RGB) LED instead, you'll see basic on/off blinking but not color differentiation.
 
 ## Building
 
@@ -237,14 +237,16 @@ ld factory-reset
 
 ## LED Status
 
-The WS2812 RGB LED indicates the current Zigbee connection state:
+The built-in LED on GPIO8 indicates the current Zigbee connection state:
 
-| Color | Meaning |
-|-------|---------|
-| **Amber** | Not joined to a Zigbee network |
-| **Blue** | Pairing in progress (steering mode) |
-| **Green** | Joined to network and operational |
-| **Red** | Error (check serial logs) |
+| Color/Pattern | Meaning |
+|---------------|---------|
+| **Amber blink** | Not joined to a Zigbee network |
+| **Blue blink** | Pairing in progress (steering mode) |
+| **Green solid** | Joined to network and operational |
+| **Red blink** | Error or factory reset in progress (check serial logs) |
+
+**Note**: RGB color indication requires an addressable RGB LED (WS2812-compatible) on GPIO8, which is standard on many ESP32-H2 development boards like the ESP32-H2-DevKitM-1. If your board has a simple single-color LED, you'll see blink patterns (on/off) instead of color changes, which still provides basic status feedback.
 
 ## Factory Reset
 
