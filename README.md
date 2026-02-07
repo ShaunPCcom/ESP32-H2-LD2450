@@ -4,19 +4,53 @@
 
 ## Overview
 
-ESP32-H2 + HLK-LD2450 mmWave presence sensor with native Zigbee support. This firmware provides a drop-in Zigbee replacement for the ESPHome WiFi version, exposing the same entities to Home Assistant so existing automations and Plotly zone configuration cards continue to work.
+ESP32-H2 + HLK-LD2450 mmWave presence sensor with native Zigbee support. This firmware is a Zigbee alternative to ESPHome-based implementations, bringing native Zigbee mesh networking to the LD2450 sensor.
 
-The LD2450 is a 24GHz mmWave radar sensor that tracks up to 3 targets simultaneously, reporting their X/Y coordinates in millimeters. This firmware adds 5 configurable polygon zones for room-level presence detection and integrates everything into Home Assistant via Zigbee2MQTT.
+The LD2450 is a 24GHz mmWave radar sensor that tracks up to 3 targets simultaneously, reporting their X/Y coordinates in millimeters. This firmware adds **5 configurable quadrilateral zones** for room-level presence detection and integrates everything into Home Assistant via Zigbee2MQTT.
+
+**Based on**: [TillFleisch/ESPHome-HLK-LD2450](https://github.com/TillFleisch/ESPHome-HLK-LD2450) - UART protocol implementation derived from this ESPHome component (MIT License). Reimplemented in C for ESP-IDF with Zigbee support and multi-zone architecture.
 
 ## Features
 
 - **3-target tracking**: Real-time X/Y coordinates (mm) for up to 3 moving targets
-- **5 polygon zones**: Define custom presence detection areas (e.g., "couch", "desk", "bed")
+- **5 configurable zones**: Define custom quadrilateral presence detection areas (e.g., "couch", "desk", "bed")
 - **Zigbee2MQTT integration**: 59 Home Assistant entities via external converter
-- **NVS persistence**: All configuration survives reboots
+- **NVS persistence**: All configuration survives reboots (independent of coordinator)
 - **Serial CLI**: Configure zones, tracking mode, distance/angle limits over UART
 - **LED status indicator**: WS2812 RGB shows connection state
-- **Factory reset**: 3-second button hold to leave network and reset to defaults
+- **Two-level factory reset**: 3s hold = Zigbee network reset (keeps config), 10s hold = full factory reset
+
+## Comparison: Zigbee vs ESPHome
+
+This Zigbee implementation offers different trade-offs compared to ESPHome-based versions:
+
+### **Advantages of Zigbee Version**
+- ✅ **Native Zigbee** - No WiFi configuration, works with any Zigbee coordinator
+- ✅ **Mesh networking** - Router-capable, extends Zigbee network range
+- ✅ **NVS persistence** - Config survives without coordinator connection
+- ✅ **Multi-endpoint architecture** - 6 Zigbee endpoints (cleaner HA organization)
+- ✅ **Two-level factory reset** - Separate Zigbee vs full config reset
+- ✅ **Serial CLI** - Direct UART configuration without network dependency
+- ✅ **5 configurable zones** - More than typical ESPHome examples (which show 1 zone)
+
+### **Advantages of ESPHome Version**
+- ✅ **Unlimited zones** - Component supports unlimited zones (vs fixed 5)
+- ✅ **Flexible polygons** - 3+ vertices per zone (vs fixed 4-vertex quadrilaterals)
+- ✅ **Rich per-target data** - Individual speed, distance, angle sensors per target
+- ✅ **Dynamic zone updates** - Runtime polygon updates via actions
+- ✅ **Web interface** - ESPHome web UI for configuration
+- ✅ **WiFi diagnostics** - Built-in web-based tools
+
+### **Equivalent Features**
+- Occupancy detection (overall + per-zone)
+- Target count reporting
+- Max distance / angle limits
+- Tracking mode (single/multi)
+- Coordinate publishing
+- Restart button
+
+**Choose Zigbee if**: You want native Zigbee mesh, simpler setup, or network-independent config.
+**Choose ESPHome if**: You need unlimited zones, flexible polygons, or prefer WiFi/web management.
 
 ## Hardware
 
@@ -179,6 +213,27 @@ ld factory-reset
 ```
 
 **Note**: CLI changes are immediately saved to NVS and persist across reboots.
+
+### Configuration Best Practices
+
+**During Zone Setup:**
+1. Enable **coordinate publishing** (`switch.ld2450_coord_publishing` → ON)
+2. Enable **single target tracking** (`switch.ld2450_tracking_mode` → Single Target)
+3. Walk through each zone one at a time to verify boundaries
+4. Use a Plotly graph card (see examples) to visualize target position and zones
+
+**During Normal Operation:**
+1. Disable **coordinate publishing** (`switch.ld2450_coord_publishing` → OFF)
+   - Reduces Zigbee traffic
+   - Only needed for setup/debugging
+2. Enable **multi-target tracking** (`switch.ld2450_tracking_mode` → Multi Target)
+   - Tracks up to 3 people simultaneously
+   - Better for real-world occupancy detection
+
+**Why This Matters:**
+- **Single target mode** during setup makes it easier to test one zone at a time (only one person tracked)
+- **Coordinate publishing off** during normal operation reduces network overhead (occupancy is all you need for automations)
+- **Multi-target mode** during operation allows tracking multiple people moving through different zones
 
 ## LED Status
 
