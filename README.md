@@ -174,7 +174,7 @@ ld nvs
 # Restart device
 ld reboot
 
-# Factory reset (erase Zigbee network and re-pair)
+# Full factory reset (erase Zigbee network + NVS config)
 ld factory-reset
 ```
 
@@ -193,13 +193,30 @@ The WS2812 RGB LED indicates the current Zigbee connection state:
 
 ## Factory Reset
 
-To leave the Zigbee network and reset all configuration to defaults:
+Two levels of reset are available via the BOOT button (GPIO9):
 
-1. Hold the BOOT button (GPIO9) for 3 seconds
-2. LED will turn amber when reset is complete
-3. Device is ready to pair with a new coordinator
+### Zigbee Network Reset (3 seconds)
+Leaves the Zigbee network but **keeps zones and configuration**. Useful for moving the sensor to a different coordinator.
 
-**Note**: You can also trigger a factory reset from Zigbee2MQTT UI (Device → Settings → Remove).
+1. Hold BOOT button for 3-10 seconds
+2. **LED feedback**:
+   - 1-3s: Fast red blink (building to reset)
+   - 3-10s: Slow red blink (Zigbee reset armed)
+3. Release between 3-10 seconds
+4. Device resets Zigbee network, keeps config, ready to re-pair
+
+### Full Factory Reset (10 seconds)
+Erases **both** Zigbee network and NVS configuration (zones, max distance, angles, etc.). Complete reset to defaults.
+
+1. Hold BOOT button for >10 seconds
+2. **LED feedback**:
+   - 1-3s: Fast red blink
+   - 3-10s: Slow red blink
+   - >10s: Solid red (full reset armed)
+3. Release after 10 seconds
+4. Device resets everything to factory defaults
+
+**Note**: You can also trigger a Zigbee network reset from Zigbee2MQTT UI (Device → Settings → Remove). For a full reset via CLI, use `ld factory-reset`.
 
 ## Architecture
 

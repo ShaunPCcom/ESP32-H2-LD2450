@@ -50,7 +50,7 @@ static void print_help(void)
         "  ld config\n"
         "  ld nvs                       (test NVS health)\n"
         "  ld reboot\n"
-        "  ld factory-reset             (erase Zigbee network, re-pair)\n\n"
+        "  ld factory-reset             (FULL reset: erase Zigbee + config)\n\n"
     );
 }
 
@@ -373,10 +373,10 @@ zone_done:
             }
 
             if (strcmp(cmd, "factory-reset") == 0) {
-                printf("Erasing Zigbee network data and restarting...\n");
+                printf("FULL FACTORY RESET: Erasing Zigbee network + NVS config...\n");
                 fflush(stdout);
                 vTaskDelay(pdMS_TO_TICKS(100));
-                zigbee_factory_reset();
+                zigbee_full_factory_reset();
             }
 
             if (strcmp(cmd, "reboot") == 0) {

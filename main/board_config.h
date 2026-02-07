@@ -13,6 +13,7 @@
 #define LD2450_UART_BAUD     256000
 
 // BOOT button (active-low, internal pull-up)
-#define BOARD_BUTTON_GPIO    GPIO_NUM_9
-#define BOARD_BUTTON_HOLD_MS 3000
+#define BOARD_BUTTON_GPIO              GPIO_NUM_9
+#define BOARD_BUTTON_HOLD_ZIGBEE_MS    3000   /* Zigbee network reset */
+#define BOARD_BUTTON_HOLD_FULL_MS      10000  /* Full factory reset (Zigbee + NVS) */
 

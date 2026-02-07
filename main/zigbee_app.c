@@ -9,6 +9,7 @@
 #include "freertos/task.h"
 
 #include "nvs_flash.h"
+#include "nvs.h"
 
 /* Zigbee SDK */
 #include "esp_zigbee_core.h"
@@ -603,7 +604,7 @@ static void zigbee_task(void *pv)
 
 void zigbee_factory_reset(void)
 {
-    ESP_LOGW(TAG, "Zigbee factory reset - erasing network data and restarting");
+    ESP_LOGW(TAG, "Zigbee network reset - leaving network, keeping config");
     board_led_set_state(BOARD_LED_ERROR);
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_zb_factory_reset();
@@ -612,8 +613,29 @@ void zigbee_factory_reset(void)
     esp_restart();
 }
 
+void zigbee_full_factory_reset(void)
+{
+    ESP_LOGW(TAG, "FULL factory reset - erasing Zigbee network + NVS config");
+    board_led_set_state(BOARD_LED_ERROR);
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    /* Erase application NVS namespace */
+    nvs_handle_t h;
+    if (nvs_open("ld2450_cfg", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_erase_all(h);
+        nvs_commit(h);
+        nvs_close(h);
+        ESP_LOGI(TAG, "NVS config erased");
+    }
+
+    /* Then erase Zigbee network data and restart */
+    esp_zb_factory_reset();
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_restart();
+}
+
 /* ================================================================== */
-/*  Boot button monitor (GPIO9, active-low, hold 3s = factory reset)   */
+/*  Boot button monitor: 3s = Zigbee reset, 10s = full factory reset  */
 /* ================================================================== */
 
 static void button_task(void *pv)
@@ -630,24 +652,47 @@ static void button_task(void *pv)
     gpio_config(&io_conf);
 
     uint32_t held_ms = 0;
+    uint32_t blink_counter = 0;
 
     while (1) {
         if (gpio_get_level(BOARD_BUTTON_GPIO) == 0) {
+            /* Button pressed */
             held_ms += 100;
-            if (held_ms == 1000) {
-                /* Visual feedback: fast red blink while holding */
+            blink_counter++;
+
+            if (held_ms >= 1000 && held_ms < BOARD_BUTTON_HOLD_ZIGBEE_MS) {
+                /* 1-3s: Fast red blink (every 200ms) - building to Zigbee reset */
+                if (blink_counter % 2 == 0) {
+                    board_led_set_state(BOARD_LED_ERROR);
+                } else {
+                    board_led_set_state(BOARD_LED_NOT_JOINED);
+                }
+            } else if (held_ms >= BOARD_BUTTON_HOLD_ZIGBEE_MS && held_ms < BOARD_BUTTON_HOLD_FULL_MS) {
+                /* 3-10s: Slow red blink (every 500ms) - Zigbee reset armed, holding for full */
+                if ((blink_counter / 5) % 2 == 0) {
+                    board_led_set_state(BOARD_LED_ERROR);
+                } else {
+                    board_led_set_state(BOARD_LED_NOT_JOINED);
+                }
+            } else if (held_ms >= BOARD_BUTTON_HOLD_FULL_MS) {
+                /* >10s: Solid red - full reset armed */
                 board_led_set_state(BOARD_LED_ERROR);
             }
-            if (held_ms >= BOARD_BUTTON_HOLD_MS) {
-                zigbee_factory_reset();
-            }
         } else {
-            if (held_ms >= 1000) {
-                /* Released early - restore LED to current network state */
+            /* Button released */
+            if (held_ms >= BOARD_BUTTON_HOLD_FULL_MS) {
+                /* >10s hold: Full factory reset (Zigbee + NVS) */
+                zigbee_full_factory_reset();
+            } else if (held_ms >= BOARD_BUTTON_HOLD_ZIGBEE_MS) {
+                /* 3-10s hold: Zigbee network reset only */
+                zigbee_factory_reset();
+            } else if (held_ms >= 1000) {
+                /* 1-3s hold: Cancelled - restore LED to current network state */
                 board_led_set_state(s_network_joined
                     ? BOARD_LED_JOINED : BOARD_LED_NOT_JOINED);
             }
             held_ms = 0;
+            blink_counter = 0;
         }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
