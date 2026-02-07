@@ -74,7 +74,7 @@ This Zigbee implementation offers different trade-offs compared to ESPHome-based
 **Notes**:
 - UART baud rate: 256000
 - GPIO9 is the ESP32-H2 DevKit BOOT button (active-low, internal pull-up)
-- **GPIO8 Status LED**: Many ESP32-H2 development boards (such as the ESP32-H2-DevKitM-1) include a built-in addressable RGB LED on GPIO8. The firmware uses the ESP-IDF `led_strip` driver to display color-coded status. If your board has a simple (non-RGB) LED instead, you'll see basic on/off blinking but not color differentiation.
+- **GPIO8 Status LED**: Many ESP32-H2 development boards (such as the ESP32-H2-DevKitM-1) include a built-in addressable RGB LED (WS2812) connected to GPIO8. This is the programmable status LED that shows Zigbee connection state. The firmware uses the ESP-IDF `led_strip` driver to display color-coded status. Note: Your board may also have a separate red power LED that stays on when powered - this is not the status LED.
 
 ## Building
 
@@ -246,7 +246,7 @@ The built-in LED on GPIO8 indicates the current Zigbee connection state:
 | **Green solid** | Joined to network and operational |
 | **Red blink** | Error or factory reset in progress (check serial logs) |
 
-**Note**: RGB color indication requires an addressable RGB LED (WS2812-compatible) on GPIO8, which is standard on many ESP32-H2 development boards like the ESP32-H2-DevKitM-1. If your board has a simple single-color LED, you'll see blink patterns (on/off) instead of color changes, which still provides basic status feedback.
+**Note**: RGB color indication requires an addressable RGB LED (WS2812-compatible) on GPIO8, which is standard on many ESP32-H2 development boards like the ESP32-H2-DevKitM-1. This is the programmable LED that changes colors, not the power LED. If your board only has a simple single-color LED on GPIO8, you'll see blink patterns (on/off) instead of color changes, which still provides basic status feedback.
 
 ## Factory Reset
 
