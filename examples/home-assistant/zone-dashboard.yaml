@@ -1,0 +1,435 @@
+# LD2450 Zigbee Sensor - Complete Zone Configuration Dashboard
+# Full dashboard tab with zone coordinate inputs, visualization, and controls
+#
+# Based on: Anthony Hua's LD2450-map-chart.yaml
+# https://github.com/athua/ha-utils/blob/main/LD2450-map-chart.yaml
+# Modified for Zigbee entity naming and 5-zone support
+#
+# Prerequisites:
+# - Plotly Graph Card installed via HACS
+# - Replace YOUR_DEVICE_ID with your Zigbee device IEEE address
+# - Customize zone names and headings as needed
+#
+type: sections
+max_columns: 4
+title: Living Room Zones
+path: new-living-room-zones
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Whole Room Zone Coordinates
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: number.YOUR_DEVICE_ID_zone_1_x1
+            name: Point 1 X
+          - entity: number.YOUR_DEVICE_ID_zone_1_y1
+            name: Point 1 Y
+          - entity: number.YOUR_DEVICE_ID_zone_1_x2
+            name: Point 2 X
+          - entity: number.YOUR_DEVICE_ID_zone_1_y2
+            name: Point 2 Y
+          - entity: number.YOUR_DEVICE_ID_zone_1_x3
+            name: Point 3 X
+          - entity: number.YOUR_DEVICE_ID_zone_1_y3
+            name: Point 3 Y
+          - entity: number.YOUR_DEVICE_ID_zone_1_x4
+            name: Point 4 X
+          - entity: number.YOUR_DEVICE_ID_zone_1_y4
+            name: Point 4 Y
+  - type: grid
+    cards:
+      - type: heading
+        heading: Shelf Unit Zone
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: number.YOUR_DEVICE_ID_zone_2_x1
+            name: Point 1 X
+          - entity: number.YOUR_DEVICE_ID_zone_2_y1
+            name: Point 1 Y
+          - entity: number.YOUR_DEVICE_ID_zone_2_x2
+            name: Point 2 X
+          - entity: number.YOUR_DEVICE_ID_zone_2_y2
+            name: Point 2 Y
+          - entity: number.YOUR_DEVICE_ID_zone_2_x3
+            name: Point 3 X
+          - entity: number.YOUR_DEVICE_ID_zone_2_y3
+            name: Point 3 Y
+          - entity: number.YOUR_DEVICE_ID_zone_2_x4
+            name: Point 4 X
+          - entity: number.YOUR_DEVICE_ID_zone_2_y4
+            name: Point 4 Y
+  - type: grid
+    cards:
+      - type: heading
+        heading: Zone 3 Coordinates (Unused)
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: number.YOUR_DEVICE_ID_zone_3_x1
+            name: Point 1 X
+          - entity: number.YOUR_DEVICE_ID_zone_3_y1
+            name: Point 1 Y
+          - entity: number.YOUR_DEVICE_ID_zone_3_x2
+            name: Point 2 X
+          - entity: number.YOUR_DEVICE_ID_zone_3_y2
+            name: Point 2 Y
+          - entity: number.YOUR_DEVICE_ID_zone_3_x3
+            name: Point 3 X
+          - entity: number.YOUR_DEVICE_ID_zone_3_y3
+            name: Point 3 Y
+          - entity: number.YOUR_DEVICE_ID_zone_3_x4
+            name: Point 4 X
+          - entity: number.YOUR_DEVICE_ID_zone_3_y4
+            name: Point 4 Y
+  - type: grid
+    cards:
+      - type: heading
+        heading: Zone 4 Coordinates (Unused)
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: number.YOUR_DEVICE_ID_zone_4_x1
+            name: Point 1 X
+          - entity: number.YOUR_DEVICE_ID_zone_4_y1
+            name: Point 1 Y
+          - entity: number.YOUR_DEVICE_ID_zone_4_x2
+            name: Point 2 X
+          - entity: number.YOUR_DEVICE_ID_zone_4_y2
+            name: Point 2 Y
+          - entity: number.YOUR_DEVICE_ID_zone_4_x3
+            name: Point 3 X
+          - entity: number.YOUR_DEVICE_ID_zone_4_y3
+            name: Point 3 Y
+          - entity: number.YOUR_DEVICE_ID_zone_4_x4
+            name: Point 4 X
+          - entity: number.YOUR_DEVICE_ID_zone_4_y4
+            name: Point 4 Y
+  - type: grid
+    cards:
+      - type: heading
+        heading: Zone 5 Coordinates (Unused)
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: number.YOUR_DEVICE_ID_zone_5_x1
+            name: Point 1 X
+          - entity: number.YOUR_DEVICE_ID_zone_5_y1
+            name: Point 1 Y
+          - entity: number.YOUR_DEVICE_ID_zone_5_x2
+            name: Point 2 X
+          - entity: number.YOUR_DEVICE_ID_zone_5_y2
+            name: Point 2 Y
+          - entity: number.YOUR_DEVICE_ID_zone_5_x3
+            name: Point 3 X
+          - entity: number.YOUR_DEVICE_ID_zone_5_y3
+            name: Point 3 Y
+          - entity: number.YOUR_DEVICE_ID_zone_5_x4
+            name: Point 4 X
+          - entity: number.YOUR_DEVICE_ID_zone_5_y4
+            name: Point 4 Y
+  - type: grid
+    cards:
+      - type: heading
+        heading: Visual Zones
+        heading_style: title
+      - type: custom:plotly-graph
+        title: mmWave Radar Sensor
+        refresh_interval: 1
+        hours_to_show: current_day
+        layout:
+          height: 520
+          margin:
+            l: 50
+            r: 20
+            t: 20
+            b: 40
+          showlegend: true
+          xaxis:
+            dtick: 1
+            gridcolor: RGBA(200,200,200,0.15)
+            zerolinecolor: RGBA(200,200,200,0.15)
+            type: number
+            fixedrange: true
+            range:
+              - -6
+              - 6
+          yaxis:
+            dtick: 1
+            gridcolor: RGBA(200,200,200,0.15)
+            zerolinecolor: RGBA(200,200,200,0.15)
+            scaleanchor: x
+            scaleratio: 1
+            fixedrange: true
+            range:
+              - 6
+              - 0
+        entities:
+          - entity: ""
+            name: Target1
+            marker:
+              size: 12
+            line:
+              shape: spline
+              width: 5
+            x:
+              - $ex hass.states["sensor.YOUR_DEVICE_ID_target_1_x"].state /1
+            "y":
+              - $ex hass.states["sensor.YOUR_DEVICE_ID_target_1_y"].state /1
+          - entity: ""
+            name: Target2
+            marker:
+              size: 12
+            line:
+              shape: spline
+              width: 5
+            x:
+              - $ex hass.states["sensor.YOUR_DEVICE_ID_target_2_x"].state /1
+            "y":
+              - $ex hass.states["sensor.YOUR_DEVICE_ID_target_2_y"].state /1
+          - entity: ""
+            name: Target3
+            marker:
+              size: 12
+            line:
+              shape: spline
+              width: 5
+            x:
+              - $ex hass.states["sensor.YOUR_DEVICE_ID_target_3_x"].state /1
+            "y":
+              - $ex hass.states["sensor.YOUR_DEVICE_ID_target_3_y"].state /1
+          - entity: ""
+            name: Zone1
+            mode: lines
+            fill: toself
+            fillcolor: RGBA(20,200,0,0.1)
+            line:
+              color: RGBA(20,200,0,0.2)
+              shape: line
+              width: 2
+            x:
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_1_x1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_1_x2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_1_x3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_1_x4"].state /1
+            "y":
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_1_y1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_1_y2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_1_y3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_1_y4"].state /1
+          - entity: ""
+            name: Zone2
+            mode: lines
+            fill: toself
+            fillcolor: RGBA(200,0,255,0.1)
+            line:
+              color: RGBA(200,0,255,0.2)
+              shape: line
+              width: 2
+            x:
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_2_x1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_2_x2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_2_x3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_2_x4"].state /1
+            "y":
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_2_y1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_2_y2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_2_y3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_2_y4"].state /1
+          - entity: ""
+            name: Zone3
+            mode: lines
+            fill: toself
+            fillcolor: RGBA(200,120,55,0.1)
+            line:
+              color: RGBA(200,120,55,0.2)
+              shape: line
+              width: 2
+            x:
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_3_x1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_3_x2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_3_x3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_3_x4"].state /1
+            "y":
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_3_y1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_3_y2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_3_y3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_3_y4"].state /1
+          - entity: ""
+            name: Zone4
+            mode: lines
+            fill: toself
+            fillcolor: RGBA(200,250,55,0.3)
+            line:
+              color: RGBA(200,220,55,0.2)
+              shape: line
+              width: 2
+            x:
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_4_x1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_4_x2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_4_x3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_4_x4"].state /1
+            "y":
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_4_y1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_4_y2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_4_y3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_4_y4"].state /1
+          - entity: ""
+            name: Zone5
+            mode: lines
+            fill: toself
+            fillcolor: RGBA(120,75,55,0.4)
+            line:
+              color: RGBA(120,55,55,0.4)
+              shape: line
+              width: 2
+            x:
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_5_x1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_5_x2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_5_x3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_5_x4"].state /1
+            "y":
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_5_y1"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_5_y2"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_5_y3"].state /1
+              - $ex hass.states["number.YOUR_DEVICE_ID_zone_5_y4"].state /1
+          - entity: ""
+            name: Coverage
+            mode: lines
+            fill: tonexty
+            fillcolor: rgba(168, 216, 234, 0.15)
+            line:
+              shape: line
+              width: 1
+              dash: dot
+            x:
+              - 0
+              - $ex 600 * Math.sin((2 * Math.PI)/360 * 60)
+              - 450
+              - 400
+              - 300
+              - 200
+              - 100
+              - 0
+              - -100
+              - -200
+              - -300
+              - -400
+              - -450
+              - $ex -600 * Math.sin((2 * Math.PI)/360 * 60)
+              - 0
+            "y":
+              - 0
+              - $ex 600 * Math.cos((2 * Math.PI)/360 * 60)
+              - $ex Math.sqrt( 600**2 - 450**2 )
+              - $ex Math.sqrt( 600**2 - 400**2 )
+              - $ex Math.sqrt( 600**2 - 300**2 )
+              - $ex Math.sqrt( 600**2 - 200**2 )
+              - $ex Math.sqrt( 600**2 - 100**2 )
+              - 600
+              - $ex Math.sqrt( 600**2 - 100**2 )
+              - $ex Math.sqrt( 600**2 - 200**2 )
+              - $ex Math.sqrt( 600**2 - 300**2 )
+              - $ex Math.sqrt( 600**2 - 400**2 )
+              - $ex Math.sqrt( 600**2 - 450**2 )
+              - $ex 600 * Math.cos((2 * Math.PI)/360 * 60)
+              - 0
+        raw_plotly_config: true
+        grid_options:
+          columns: full
+    column_span: 3
+badges:
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_1_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: Whole Room
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_2_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: Shelf Unit
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_3_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: Zone 3
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_4_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: Zone 4
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_5_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: zone 5
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: button.YOUR_DEVICE_ID_restart
+    name: Restart Device
+    tap_action:
+      action: toggle
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: sensor.YOUR_DEVICE_ID_target_1_x
+    name: Taget X Position
+    tap_action:
+      action: none
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: sensor.YOUR_DEVICE_ID_target_1_y
+    name: Target Y Position
+    tap_action:
+      action: none
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: switch.YOUR_DEVICE_ID_tracking_mode
+    name: Multi Target
+    tap_action:
+      action: toggle
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: switch.YOUR_DEVICE_ID_coord_publishing
+    name: Coordinates
+    tap_action:
+      action: toggle
+header:
+  card:
+    type: markdown
+    text_only: true
+    content: Spare Room Presence
+cards: []
+

@@ -235,6 +235,14 @@ ld factory-reset
 - **Coordinate publishing off** during normal operation reduces network overhead (occupancy is all you need for automations)
 - **Multi-target mode** during operation allows tracking multiple people moving through different zones
 
+## Examples
+
+### Home Assistant Plotly Dashboard
+
+The `examples/home-assistant/` directory includes interactive Plotly dashboard examples for visualizing sensor data and zones. These dashboards are useful during zone setup and for debugging target tracking behavior.
+
+See [`examples/home-assistant/README.md`](examples/home-assistant/README.md) for setup instructions.
+
 ## LED Status
 
 The built-in LED on GPIO8 indicates the current Zigbee connection state:
