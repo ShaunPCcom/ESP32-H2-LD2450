@@ -23,6 +23,7 @@
 #include "ld2450_cmd.h"
 #include "nvs_config.h"
 #include "zigbee_defs.h"
+#include "zigbee_ota.h"
 
 static const char *TAG = "zigbee";
 
@@ -145,6 +146,15 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cl, identify, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cl, occ, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cl, custom, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+
+    /* Add OTA cluster */
+    zigbee_ota_config_t ota_cfg = ZIGBEE_OTA_CONFIG_DEFAULT();
+    ota_cfg.manufacturer_code = 0x131B;  /* Espressif */
+    ota_cfg.image_type = 0x0001;         /* LD2450 application */
+    ota_cfg.current_file_version = 0x00010000;  /* v1.0.0.0 */
+    ota_cfg.hw_version = 1;
+    ota_cfg.query_interval_minutes = 1440;  /* Check every 24 hours */
+    ESP_ERROR_CHECK(zigbee_ota_init(cl, ZB_EP_MAIN, &ota_cfg));
 
     return cl;
 }
@@ -356,6 +366,13 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
 
 static esp_err_t action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
 {
+    /* Route OTA callbacks to OTA component */
+    esp_err_t ret = zigbee_ota_action_handler(callback_id, message);
+    if (ret != ESP_ERR_NOT_SUPPORTED) {
+        return ret;  /* OTA component handled it */
+    }
+
+    /* Handle application callbacks */
     if (callback_id == ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID) {
         return handle_set_attr_value((const esp_zb_zcl_set_attr_value_message_t *)message);
     }

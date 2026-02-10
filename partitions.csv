@@ -1,7 +1,10 @@
+# ESP32-H2 Partition Table - 4MB Flash with Dual OTA
 # Name,      Type, SubType, Offset,   Size,    Flags
-nvs,         data, nvs,     0x9000,   0x6000,
-phy_init,    data, phy,     0xF000,   0x1000,
-factory,     app,  factory, 0x10000,  0x170000,
-zb_storage,  data, fat,     0x180000, 0x4000,
-zb_fct,      data, fat,     0x184000, 0x1000,
+nvs,         data, nvs,     0x9000,   24K,
+otadata,     data, ota,     ,         8K,
+phy_init,    data, phy,     ,         4K,
+ota_0,       app,  ota_0,   ,         1700K,
+ota_1,       app,  ota_1,   ,         1700K,
+zb_storage,  data, fat,     ,         16K,
+zb_fct,      data, fat,     ,         1K,
 

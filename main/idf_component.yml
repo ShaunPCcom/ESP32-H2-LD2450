@@ -17,3 +17,6 @@ dependencies:
   espressif/esp-zigbee-lib: ^1.6.4
   espressif/esp-zboss-lib: '*'
   led_strip: "*"
+  zigbee_ota:
+    git: https://github.com/ShaunPCcom/esp32-zigbee-ota.git
+    version: "main"
