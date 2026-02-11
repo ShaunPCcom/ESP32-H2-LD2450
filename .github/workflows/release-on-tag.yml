@@ -77,16 +77,19 @@ jobs:
             python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util \
             libusb-1.0-0
 
-      - name: Setup ESP-IDF
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: v5.5.2
-          target: esp32h2
+      - name: Clone ESP-IDF
+        run: |
+          git clone --recursive --branch v5.5.2 --depth 1 https://github.com/espressif/esp-idf.git
+          cd esp-idf
+          ./install.sh esp32h2
+
+      - name: Clone ESP Zigbee SDK
+        run: |
+          git clone --recursive --branch main --depth 1 https://github.com/espressif/esp-zigbee-sdk.git
 
       - name: Build firmware
         run: |
-          cd $GITHUB_WORKSPACE
-          . $IDF_PATH/export.sh
+          . esp-idf/export.sh
           idf.py build
 
           echo "✅ Firmware built successfully"
@@ -101,7 +104,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           FILE_VERSION_HEX="${{ steps.version.outputs.file_version_hex }}"
 
-          python3 ${ESP_ZIGBEE_SDK}/tools/mfg_tool/image_builder_tool.py \
+          python3 esp-zigbee-sdk/tools/mfg_tool/image_builder_tool.py \
             -mn "LD2450Z" \
             -mc 0x131B \
             -mt 0x0001 \
