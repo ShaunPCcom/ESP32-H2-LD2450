@@ -107,12 +107,11 @@ jobs:
           FILE_VERSION_HEX="${{ steps.version.outputs.file_version_hex }}"
 
           python3 esp-zigbee-sdk/tools/image_builder_tool/image_builder_tool.py \
-            -mn "LD2450Z" \
-            -mc 0x131B \
-            -mt 0x0001 \
-            -fv ${FILE_VERSION_HEX} \
-            -in build/ld2450_zb_h2.bin \
-            -o ld2450_zb_h2_v${VERSION}.ota
+            -c ld2450_zb_h2_v${VERSION}.ota \
+            -v ${FILE_VERSION_HEX} \
+            -m 0x131B \
+            -i 0x0001 \
+            -f build/ld2450_zb_h2.bin
 
           echo "✅ OTA image created"
           ls -lh ld2450_zb_h2_v${VERSION}.ota
