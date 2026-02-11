@@ -34,9 +34,10 @@ jobs:
           IFS='.' read -r major minor patch build <<< "$VERSION_CLEAN"
           if [ -z "$build" ]; then build=0; fi
 
-          # Calculate hex fileVersion (0xMMmmppbb)
-          file_version=$(printf "0x%02x%02x%02x%02x" $major $minor $patch $build)
-          file_version_dec=$((file_version))
+          # Calculate hex fileVersion: (major << 16) | (minor << 8) | build
+          # Format: 0x00MMmmBB where MM=major, mm=minor, BB=build (patch unused)
+          file_version_dec=$((major * 65536 + minor * 256 + build))
+          file_version=$(printf "0x%08x" $file_version_dec)
 
           echo "file_version_hex=${file_version}" >> $GITHUB_OUTPUT
           echo "file_version_dec=${file_version_dec}" >> $GITHUB_OUTPUT
