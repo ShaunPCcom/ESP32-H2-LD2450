@@ -162,6 +162,19 @@ Firmware releases are hosted on GitHub. To check for updates or manually downloa
 
 **Note**: The device checks for updates every 24 hours by default. You can trigger a manual check from the Z2M UI "About" tab.
 
+### Release Automation
+
+Firmware releases are fully automated using GitHub Actions. When a new version is tagged in the repository:
+
+1. **Automated build**: ESP-IDF builds the firmware on Ubuntu runners
+2. **OTA image creation**: Zigbee OTA format packaging with proper headers
+3. **GitHub release**: Published with release notes from git commits
+4. **OTA index update**: `z2m/ota_index.json` automatically updated with download URL
+
+This ensures consistent, reproducible releases and enables rapid bug fixes. Users receive update notifications automatically through Zigbee2MQTT/Home Assistant within 24 hours of release publication (or on manual update check).
+
+**For developers**: See `.github/RELEASE.md` for the release process and version management details.
+
 ## Exposed Entities
 
 All entities are automatically discovered in Home Assistant via Zigbee2MQTT:
