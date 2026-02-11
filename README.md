@@ -15,6 +15,7 @@ The LD2450 is a 24GHz mmWave radar sensor that tracks up to 3 targets simultaneo
 - **3-target tracking**: Real-time X/Y coordinates (mm) for up to 3 moving targets
 - **5 configurable zones**: Define custom quadrilateral presence detection areas (e.g., "couch", "desk", "bed")
 - **Zigbee2MQTT integration**: 59 Home Assistant entities via external converter
+- **OTA firmware updates**: Remote updates via Zigbee2MQTT (dual partition rollback protection)
 - **NVS persistence**: All configuration survives reboots (independent of coordinator)
 - **Serial CLI**: Configure zones, tracking mode, distance/angle limits over UART
 - **LED status indicator**: WS2812 RGB shows connection state
@@ -27,6 +28,7 @@ This Zigbee implementation offers different trade-offs compared to ESPHome-based
 ### **Advantages of Zigbee Version**
 - ✅ **Native Zigbee** - No WiFi configuration, works with any Zigbee coordinator
 - ✅ **Mesh networking** - Router-capable, extends Zigbee network range
+- ✅ **OTA updates** - Remote firmware updates via Zigbee2MQTT with automatic rollback
 - ✅ **NVS persistence** - Config survives without coordinator connection
 - ✅ **Multi-endpoint architecture** - 6 Zigbee endpoints (cleaner HA organization)
 - ✅ **Two-level factory reset** - Separate Zigbee vs full config reset
@@ -120,6 +122,45 @@ idf.py -p /dev/ttyUSB0 flash monitor
    - In Z2M, select the device
    - Click "Reconfigure" in device settings
    - Refresh Home Assistant to see all 59 entities
+
+## Firmware Updates (OTA)
+
+This device supports Over-The-Air (OTA) firmware updates via Zigbee2MQTT. Updates are delivered wirelessly through the Zigbee network with automatic rollback protection.
+
+### Update Notifications
+
+When a new firmware version is available, Home Assistant will show an update notification via the `update.ld2450_update` entity (similar to officially supported Zigbee devices). Updates are **not** installed automatically - you must approve them manually.
+
+### Installing Updates
+
+**Via Home Assistant:**
+1. Navigate to Settings → Devices & Services → Zigbee2MQTT → [Your LD2450 device]
+2. Click "Install" on the firmware update card
+3. Monitor progress in the Zigbee2MQTT logs
+4. Device will reboot automatically after successful update
+
+**Via Zigbee2MQTT UI:**
+1. Select the device in Z2M
+2. Go to the "About" tab
+3. Click "Update to latest firmware"
+4. Monitor the OTA progress bar
+
+### Update Process
+
+1. **Download**: Firmware is transferred over Zigbee in 64-byte blocks (~2-5 minutes)
+2. **Validation**: Device verifies the downloaded image
+3. **Reboot**: Device reboots into the new firmware partition
+4. **Rollback protection**: If the new firmware fails to boot, the bootloader automatically reverts to the previous working version
+
+### Hosting Firmware Updates
+
+Firmware releases are hosted on GitHub. To check for updates or manually download firmware:
+
+1. Visit the [GitHub Releases page](https://github.com/ShaunPCcom/ESP32-H2-LD2450/releases)
+2. Download the latest `.ota` file
+3. Zigbee2MQTT automatically checks the configured OTA index for new versions
+
+**Note**: The device checks for updates every 24 hours by default. You can trigger a manual check from the Z2M UI "About" tab.
 
 ## Exposed Entities
 

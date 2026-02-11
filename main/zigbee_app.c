@@ -717,6 +717,9 @@ static void button_task(void *pv)
 
 void zigbee_app_start(void)
 {
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "LD2450 Firmware Version: v1.0.0.0");
+    ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "Starting Zigbee task...");
     xTaskCreate(zigbee_task, "zb_task", 8192, NULL, 5, NULL);
     xTaskCreate(button_task, "btn_task", 2048, NULL, 5, NULL);

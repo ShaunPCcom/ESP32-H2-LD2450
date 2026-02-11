@@ -34,7 +34,7 @@ dependencies:
       type: idf
     version: 5.5.2
   zigbee_ota:
-    component_hash: c357c2a00fc40b11dc779a7f166acd248eabb51858e7605c4acc9e8ebe65dfb1
+    component_hash: 438e1fbfdfbcc2eee22799e8331f635cc4b983d9b851dbd90fb7ab06260cc9d2
     dependencies:
     - name: espressif/esp-zigbee-lib
       version: '>=1.0.0'
@@ -47,7 +47,7 @@ dependencies:
     targets:
     - esp32h2
     - esp32c6
-    version: 67efcf479e57c418f607613950e21d1ab6800e4f
+    version: 095da09f372aca846101441b3dddc0b93c6887db
 direct_dependencies:
 - espressif/esp-zboss-lib
 - espressif/esp-zigbee-lib

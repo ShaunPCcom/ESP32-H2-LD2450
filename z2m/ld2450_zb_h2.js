@@ -266,6 +266,7 @@ const definition = {
     fromZigbee: [fzLocal.occupancy, fzLocal.config, fzLocal.zone_vertices],
     toZigbee: [tzLocal.config, tzLocal.restart, tzLocal.zone_vertices],
     exposes: exposesDefinition,
+    ota: true,  // Enable OTA update support
     meta: {
         overrideHaDiscoveryPayload: (payload) => {
             if (payload.object_id && payload.object_id.endsWith('_occupancy')) {
