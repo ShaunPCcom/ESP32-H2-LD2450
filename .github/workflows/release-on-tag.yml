@@ -23,11 +23,15 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           VERSION="${TAG#v}"
+
+          # Strip any suffix (e.g., -test, -alpha, -rc1)
+          VERSION_CLEAN="${VERSION%%-*}"
+
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-          # Convert version to hex for fileVersion
-          IFS='.' read -r major minor patch build <<< "$VERSION"
+          # Convert version to hex for fileVersion (use clean version for numbers)
+          IFS='.' read -r major minor patch build <<< "$VERSION_CLEAN"
           if [ -z "$build" ]; then build=0; fi
 
           # Calculate hex fileVersion (0xMMmmppbb)
@@ -38,6 +42,7 @@ jobs:
           echo "file_version_dec=${file_version_dec}" >> $GITHUB_OUTPUT
 
           echo "📦 Release version: ${VERSION}"
+          echo "📦 Version (clean): ${VERSION_CLEAN}"
           echo "🔢 File version (hex): ${file_version}"
           echo "🔢 File version (dec): ${file_version_dec}"
 
