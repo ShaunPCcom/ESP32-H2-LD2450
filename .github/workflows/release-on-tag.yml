@@ -178,7 +178,7 @@ jobs:
 
           git add z2m/ota_index.json
           git diff --staged --quiet || git commit -m "chore: update OTA index for ${TAG}"
-          git push
+          git push origin HEAD:master
 
           echo "✅ OTA index committed and pushed"
 
