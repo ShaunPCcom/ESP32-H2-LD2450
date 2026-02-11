@@ -85,7 +85,9 @@ jobs:
 
       - name: Clone ESP Zigbee SDK
         run: |
+          cd esp-idf/..
           git clone --recursive --branch main --depth 1 https://github.com/espressif/esp-zigbee-sdk.git
+          ls -la esp-zigbee-sdk/tools/mfg_tool/
 
       - name: Build firmware
         run: |
@@ -104,7 +106,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           FILE_VERSION_HEX="${{ steps.version.outputs.file_version_hex }}"
 
-          python3 esp-zigbee-sdk/tools/mfg_tool/image_builder_tool.py \
+          python3 ../esp-zigbee-sdk/tools/mfg_tool/image_builder_tool.py \
             -mn "LD2450Z" \
             -mc 0x131B \
             -mt 0x0001 \
