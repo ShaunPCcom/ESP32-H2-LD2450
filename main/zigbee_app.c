@@ -27,8 +27,8 @@
 
 static const char *TAG = "zigbee";
 
-/* Sensor poll interval (ms) */
-#define SENSOR_POLL_INTERVAL_MS  250
+/* Sensor poll interval (ms) - LD2450 outputs at 10Hz (100ms) */
+#define SENSOR_POLL_INTERVAL_MS  100
 
 /* Reporting intervals (seconds) */
 #define REPORT_MIN_INTERVAL   0
