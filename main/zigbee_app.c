@@ -151,7 +151,7 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     zigbee_ota_config_t ota_cfg = ZIGBEE_OTA_CONFIG_DEFAULT();
     ota_cfg.manufacturer_code = 0x131B;  /* Espressif */
     ota_cfg.image_type = 0x0001;         /* LD2450 application */
-    ota_cfg.current_file_version = 0x00010000;  /* v1.0.0.0 */
+    ota_cfg.current_file_version = 0x00010001;  /* v1.0.0.1 */
     ota_cfg.hw_version = 1;
     ota_cfg.query_interval_minutes = 1440;  /* Check every 24 hours */
     ESP_ERROR_CHECK(zigbee_ota_init(cl, ZB_EP_MAIN, &ota_cfg));
