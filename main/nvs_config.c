@@ -27,6 +27,7 @@ static const nvs_config_t DEFAULT_CONFIG = {
         { .enabled = false, .v = {{0,0},{0,0},{0,0},{0,0}} },
         { .enabled = false, .v = {{0,0},{0,0},{0,0},{0,0}} },
     },
+    .occupancy_cooldown_sec = {0, 0, 0, 0, 0, 0},  /* No cooldown by default for all endpoints */
 };
 
 static esp_err_t nvs_save_u8(const char *key, uint8_t val)
@@ -96,6 +97,21 @@ esp_err_t nvs_config_init(void)
         nvs_get_blob(h, key, &s_cfg.zones[i], &len);
     }
 
+    /* Load occupancy cooldown - try new array format first, fall back to old single value */
+    size_t cooldown_len = sizeof(s_cfg.occupancy_cooldown_sec);
+    esp_err_t cool_err = nvs_get_blob(h, "occ_cool", s_cfg.occupancy_cooldown_sec, &cooldown_len);
+    if (cool_err == ESP_ERR_NVS_NOT_FOUND) {
+        /* Try loading old single-value format for backward compatibility */
+        uint16_t old_cooldown = 0;
+        if (nvs_get_u16(h, "occ_cool", &old_cooldown) == ESP_OK) {
+            /* Populate all endpoints with the old single value */
+            for (int i = 0; i < 6; i++) {
+                s_cfg.occupancy_cooldown_sec[i] = old_cooldown;
+            }
+            ESP_LOGI(TAG, "Migrated old cooldown value %u to all endpoints", old_cooldown);
+        }
+    }
+
     nvs_close(h);
 
     ESP_LOGI(TAG, "Config loaded: dist=%u left=%u right=%u bt_off=%u mode=%u coords=%u",
@@ -160,4 +176,12 @@ esp_err_t nvs_config_save_zone(uint8_t zone_index, const ld2450_zone_t *zone)
     char key[12];
     snprintf(key, sizeof(key), "zone_%d", zone_index);
     return nvs_save_blob(key, zone, sizeof(ld2450_zone_t));
+}
+
+esp_err_t nvs_config_save_occupancy_cooldown(uint8_t endpoint_index, uint16_t sec)
+{
+    if (endpoint_index >= 6) return ESP_ERR_INVALID_ARG;
+    if (sec > 300) sec = 300;
+    s_cfg.occupancy_cooldown_sec[endpoint_index] = sec;
+    return nvs_save_blob("occ_cool", s_cfg.occupancy_cooldown_sec, sizeof(s_cfg.occupancy_cooldown_sec));
 }

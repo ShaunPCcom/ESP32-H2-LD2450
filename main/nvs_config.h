@@ -24,6 +24,9 @@ typedef struct {
 
     /* Zones */
     ld2450_zone_t zones[5];
+
+    /* Occupancy reporting */
+    uint16_t occupancy_cooldown_sec[6];  /* 0-300 seconds per endpoint: [0]=main, [1-5]=zones */
 } nvs_config_t;
 
 /** Initialize NVS config module and load saved config (or defaults). */
@@ -40,3 +43,4 @@ esp_err_t nvs_config_save_angle_left(uint8_t deg);
 esp_err_t nvs_config_save_angle_right(uint8_t deg);
 esp_err_t nvs_config_save_bt_disabled(uint8_t disabled);
 esp_err_t nvs_config_save_zone(uint8_t zone_index, const ld2450_zone_t *zone);
+esp_err_t nvs_config_save_occupancy_cooldown(uint8_t endpoint_index, uint16_t sec);

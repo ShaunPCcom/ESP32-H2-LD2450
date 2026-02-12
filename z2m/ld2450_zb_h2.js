@@ -28,14 +28,15 @@ const ZONE_COORD_NAMES = ['x1','y1','x2','y2','x3','y3','x4','y4'];
 const ld2450ConfigCluster = {
     ID: CLUSTER_CONFIG_ID,
     attributes: {
-        targetCount:     {ID: 0x0000, type: ZCL_UINT8, report: true},
-        targetCoords:    {ID: 0x0001, type: ZCL_CHAR_STR, report: true},
-        maxDistance:      {ID: 0x0010, type: ZCL_UINT16, write: true},
-        angleLeft:       {ID: 0x0011, type: ZCL_UINT8, write: true},
-        angleRight:      {ID: 0x0012, type: ZCL_UINT8, write: true},
-        trackingMode:    {ID: 0x0020, type: ZCL_UINT8, write: true},
-        coordPublishing: {ID: 0x0021, type: ZCL_UINT8, write: true},
-        restart:         {ID: 0x00F0, type: ZCL_UINT8, write: true},
+        targetCount:        {ID: 0x0000, type: ZCL_UINT8, report: true},
+        targetCoords:       {ID: 0x0001, type: ZCL_CHAR_STR, report: true},
+        maxDistance:        {ID: 0x0010, type: ZCL_UINT16, write: true},
+        angleLeft:          {ID: 0x0011, type: ZCL_UINT8, write: true},
+        angleRight:         {ID: 0x0012, type: ZCL_UINT8, write: true},
+        trackingMode:       {ID: 0x0020, type: ZCL_UINT8, write: true},
+        coordPublishing:    {ID: 0x0021, type: ZCL_UINT8, write: true},
+        occupancyCooldown:  {ID: 0x0022, type: ZCL_UINT16, write: true},
+        restart:            {ID: 0x00F0, type: ZCL_UINT8, write: true},
     },
     commands: {},
     commandsResponse: {},
@@ -43,9 +44,12 @@ const ld2450ConfigCluster = {
 
 const ld2450ZoneCluster = {
     ID: CLUSTER_ZONE_ID,
-    attributes: Object.fromEntries(
-        ZONE_ATTR_NAMES.map((name, i) => [name, {ID: i, type: ZCL_INT16, write: true, report: true}])
-    ),
+    attributes: {
+        ...Object.fromEntries(
+            ZONE_ATTR_NAMES.map((name, i) => [name, {ID: i, type: ZCL_INT16, write: true, report: true}])
+        ),
+        occupancyCooldown: {ID: 0x0022, type: ZCL_UINT16, write: true},
+    },
     commands: {},
     commandsResponse: {},
 };
@@ -106,6 +110,9 @@ const fzLocal = {
             if (d.coordPublishing !== undefined) {
                 result.coord_publishing = d.coordPublishing === 1;
             }
+            if (d.occupancyCooldown !== undefined) {
+                result.occupancy_cooldown = d.occupancyCooldown;
+            }
 
             if (d.targetCoords !== undefined) {
                 const str = d.targetCoords || '';
@@ -138,6 +145,9 @@ const fzLocal = {
                     result[`zone_${zone}_${ZONE_COORD_NAMES[i]}`] = msg.data[ZONE_ATTR_NAMES[i]] / 1000;
                 }
             }
+            if (msg.data.occupancyCooldown !== undefined) {
+                result[`zone_${zone}_occupancy_cooldown`] = msg.data.occupancyCooldown;
+            }
             return result;
         },
     },
@@ -147,16 +157,30 @@ const fzLocal = {
 
 const tzLocal = {
     config: {
-        key: ['max_distance', 'angle_left', 'angle_right', 'tracking_mode', 'coord_publishing'],
+        key: ['max_distance', 'angle_left', 'angle_right', 'tracking_mode', 'coord_publishing', 'occupancy_cooldown',
+              'zone_1_occupancy_cooldown', 'zone_2_occupancy_cooldown', 'zone_3_occupancy_cooldown',
+              'zone_4_occupancy_cooldown', 'zone_5_occupancy_cooldown'],
         convertSet: async (entity, key, value, meta) => {
             registerCustomClusters(meta.device);
+
+            /* Check if this is a zone cooldown */
+            const zoneMatch = key.match(/^zone_(\d)_occupancy_cooldown$/);
+            if (zoneMatch) {
+                const zone = parseInt(zoneMatch[1]);
+                const ep = meta.device.getEndpoint(zone + 1);
+                await ep.write('ld2450Zone', {occupancyCooldown: value});
+                return {state: {[key]: value}};
+            }
+
+            /* Main endpoint config */
             const ep = meta.device.getEndpoint(1);
             const map = {
-                max_distance:     {attr: 'maxDistance',      val: (v) => Math.round(v * 1000)},
-                angle_left:       {attr: 'angleLeft',       val: (v) => v},
-                angle_right:      {attr: 'angleRight',      val: (v) => v},
-                tracking_mode:    {attr: 'trackingMode',    val: (v) => v ? 0 : 1},
-                coord_publishing: {attr: 'coordPublishing', val: (v) => v ? 1 : 0},
+                max_distance:        {attr: 'maxDistance',        val: (v) => Math.round(v * 1000)},
+                angle_left:          {attr: 'angleLeft',          val: (v) => v},
+                angle_right:         {attr: 'angleRight',         val: (v) => v},
+                tracking_mode:       {attr: 'trackingMode',       val: (v) => v ? 0 : 1},
+                coord_publishing:    {attr: 'coordPublishing',    val: (v) => v ? 1 : 0},
+                occupancy_cooldown:  {attr: 'occupancyCooldown',  val: (v) => v},
             };
             const m = map[key];
             await ep.write('ld2450Config', {[m.attr]: m.val(value)});
@@ -164,11 +188,22 @@ const tzLocal = {
         },
         convertGet: async (entity, key, meta) => {
             registerCustomClusters(meta.device);
+
+            /* Check if this is a zone cooldown */
+            const zoneMatch = key.match(/^zone_(\d)_occupancy_cooldown$/);
+            if (zoneMatch) {
+                const zone = parseInt(zoneMatch[1]);
+                const ep = meta.device.getEndpoint(zone + 1);
+                await ep.read('ld2450Zone', ['occupancyCooldown']);
+                return;
+            }
+
+            /* Main endpoint config */
             const ep = meta.device.getEndpoint(1);
             const attrs = {
                 max_distance: 'maxDistance', angle_left: 'angleLeft',
                 angle_right: 'angleRight', tracking_mode: 'trackingMode',
-                coord_publishing: 'coordPublishing',
+                coord_publishing: 'coordPublishing', occupancy_cooldown: 'occupancyCooldown',
             };
             await ep.read('ld2450Config', [attrs[key]]);
         },
@@ -243,6 +278,14 @@ const exposesDefinition = [
     binaryExpose('coord_publishing', 'Coordinate publishing', ACCESS_ALL, true, false,
         'Enable publishing of target coordinates'),
 
+    numericExpose('occupancy_cooldown', 'Occupancy cooldown', ACCESS_ALL,
+        'Minimum time before reporting Clear (main sensor)', {unit: 's', value_min: 0, value_max: 300, value_step: 1}),
+
+    ...Array.from({length: 5}, (_, i) =>
+        numericExpose(`zone_${i + 1}_occupancy_cooldown`, `Zone ${i + 1} occupancy cooldown`, ACCESS_ALL,
+            `Minimum time before reporting Clear (zone ${i + 1})`, {unit: 's', value_min: 0, value_max: 300, value_step: 1})
+    ),
+
     enumExpose('restart', 'Restart', ACCESS_SET, ['restart'],
         'Restart the device'),
 
@@ -297,7 +340,7 @@ const definition = {
         ]);
         await ep1.read('ld2450Config', [
             'targetCount', 'targetCoords', 'maxDistance', 'angleLeft', 'angleRight',
-            'trackingMode', 'coordPublishing',
+            'trackingMode', 'coordPublishing', 'occupancyCooldown',
         ]);
 
         for (let z = 0; z < 5; z++) {
@@ -308,7 +351,7 @@ const definition = {
                  maximumReportInterval: 300, reportableChange: 0},
             ]);
             await ep.bind('ld2450Zone', coordinatorEndpoint);
-            await ep.read('ld2450Zone', ZONE_ATTR_NAMES);
+            await ep.read('ld2450Zone', [...ZONE_ATTR_NAMES, 'occupancyCooldown']);
         }
     },
 };

@@ -44,6 +44,11 @@ static bool s_last_zone_occ[5] = {false};
 static uint8_t s_last_target_count = 0;
 static char s_last_coords[64] = {0};
 
+/* ---- Cooldown tracking (per endpoint: 0=main, 1-5=zones) ---- */
+static uint32_t s_last_report_time[6] = {0};
+static bool s_pending_clear[6] = {false};      /* tracking pending Clear reports */
+static uint32_t s_clear_start_time[6] = {0};  /* when Clear was first detected */
+
 /* ---- Forward declarations ---- */
 static void sensor_poll_cb(uint8_t param);
 static void bridge_start(void);
@@ -96,6 +101,7 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     uint8_t init_ar = cfg.angle_right_deg;
     uint8_t init_mode = cfg.tracking_mode;
     uint8_t init_coords = cfg.publish_coords;
+    uint16_t init_cooldown = cfg.occupancy_cooldown_sec[0];
 
     /* ZCL char-string: first byte = length, rest = chars. Empty string = "\x00" */
     char empty_str[2] = {0x00, 0x00};
@@ -134,6 +140,11 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
         ESP_ZB_ZCL_ATTR_TYPE_U8,
         ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
         &init_coords);
+
+    esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_OCCUPANCY_COOLDOWN,
+        ESP_ZB_ZCL_ATTR_TYPE_U16,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        &init_cooldown);
 
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_RESTART,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
@@ -203,6 +214,13 @@ static esp_zb_cluster_list_t *create_zone_ep_clusters(uint8_t zone_idx)
             ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
             &val);
     }
+
+    /* Add occupancy cooldown attribute for this zone */
+    uint16_t zone_cooldown = cfg.occupancy_cooldown_sec[zone_idx + 1];
+    esp_zb_custom_cluster_add_custom_attr(zone_custom, ZB_ATTR_OCCUPANCY_COOLDOWN,
+        ESP_ZB_ZCL_ATTR_TYPE_U16,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        &zone_cooldown);
 
     /* Assemble cluster list */
     esp_zb_cluster_list_t *cl = esp_zb_zcl_cluster_list_create();
@@ -320,6 +338,15 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
             ESP_LOGI(TAG, "Coord publishing -> %s%s", en ? "on" : "off", (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
             return ESP_OK;
         }
+        case ZB_ATTR_OCCUPANCY_COOLDOWN: {
+            uint16_t sec = *(uint16_t *)val;
+            esp_err_t err = nvs_config_save_occupancy_cooldown(0, sec);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save main occupancy_cooldown to NVS: %s", esp_err_to_name(err));
+            }
+            ESP_LOGI(TAG, "Main occupancy cooldown -> %u sec%s", sec, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            return ESP_OK;
+        }
         case ZB_ATTR_RESTART:
             ESP_LOGI(TAG, "Restart requested via Zigbee, restarting in 1s...");
             /* Delay so the ZCL Write Attributes Response is sent before we reset.
@@ -333,32 +360,46 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
 
     /* EPs 2-6: zone vertex writes */
     if (ep >= ZB_EP_ZONE_BASE && ep < ZB_EP_ZONE_BASE + ZB_EP_ZONE_COUNT
-        && cluster == ZB_CLUSTER_LD2450_ZONE
-        && attr_id < ZB_ATTR_ZONE_VERTEX_COUNT) {
+        && cluster == ZB_CLUSTER_LD2450_ZONE) {
 
         uint8_t zone_idx = ep - ZB_EP_ZONE_BASE;
-        int16_t coord_val = *(int16_t *)val;
 
-        /* Read current zone, update one coordinate, write back */
-        ld2450_zone_t zones[5];
-        ld2450_get_zones(zones, 5);
-
-        int vi = attr_id / 2;  /* vertex index */
-        if (attr_id % 2 == 0) {
-            zones[zone_idx].v[vi].x_mm = coord_val;
-        } else {
-            zones[zone_idx].v[vi].y_mm = coord_val;
+        /* Zone occupancy cooldown writes */
+        if (attr_id == ZB_ATTR_OCCUPANCY_COOLDOWN) {
+            uint16_t sec = *(uint16_t *)val;
+            esp_err_t err = nvs_config_save_occupancy_cooldown(zone_idx + 1, sec);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save zone %d occupancy_cooldown to NVS: %s", zone_idx + 1, esp_err_to_name(err));
+            }
+            ESP_LOGI(TAG, "Zone %d occupancy cooldown -> %u sec%s", zone_idx + 1, sec, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            return ESP_OK;
         }
-        zones[zone_idx].enabled = true;
 
-        ld2450_set_zone(zone_idx, &zones[zone_idx]);
-        esp_err_t err = nvs_config_save_zone(zone_idx, &zones[zone_idx]);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to save zone %d to NVS: %s", zone_idx + 1, esp_err_to_name(err));
-        } else {
-            ESP_LOGI(TAG, "Zone %d vertex attr 0x%04X -> %d (saved to NVS)", zone_idx + 1, attr_id, coord_val);
+        /* Zone vertex writes */
+        if (attr_id < ZB_ATTR_ZONE_VERTEX_COUNT) {
+            int16_t coord_val = *(int16_t *)val;
+
+            /* Read current zone, update one coordinate, write back */
+            ld2450_zone_t zones[5];
+            ld2450_get_zones(zones, 5);
+
+            int vi = attr_id / 2;  /* vertex index */
+            if (attr_id % 2 == 0) {
+                zones[zone_idx].v[vi].x_mm = coord_val;
+            } else {
+                zones[zone_idx].v[vi].y_mm = coord_val;
+            }
+            zones[zone_idx].enabled = true;
+
+            ld2450_set_zone(zone_idx, &zones[zone_idx]);
+            esp_err_t err = nvs_config_save_zone(zone_idx, &zones[zone_idx]);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save zone %d to NVS: %s", zone_idx + 1, esp_err_to_name(err));
+            } else {
+                ESP_LOGI(TAG, "Zone %d vertex attr 0x%04X -> %d (saved to NVS)", zone_idx + 1, attr_id, coord_val);
+            }
+            return ESP_OK;
         }
-        return ESP_OK;
     }
 
     return ESP_OK;
@@ -422,28 +463,92 @@ static void sensor_poll_cb(uint8_t param)
     ld2450_runtime_cfg_t rt_cfg;
     ld2450_get_runtime_cfg(&rt_cfg);
 
+    /* Get current config and time */
+    nvs_config_t cfg;
+    nvs_config_get(&cfg);
+    uint32_t current_ticks = xTaskGetTickCount();
+
     /* EP 1: Overall occupancy */
     bool occupied = state.occupied_global;
-    if (occupied != s_last_occupied) {
-        uint8_t val = occupied ? 1 : 0;
-        esp_zb_zcl_set_attribute_val(ZB_EP_MAIN,
-            ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
-            ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-            ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
-            &val, false);
-        s_last_occupied = occupied;
-    }
+    uint32_t main_cooldown_ticks = pdMS_TO_TICKS(cfg.occupancy_cooldown_sec[0] * 1000);
 
-    /* EPs 2-6: Per-zone occupancy */
-    for (int i = 0; i < 5; i++) {
-        if (state.zone_occupied[i] != s_last_zone_occ[i]) {
-            uint8_t val = state.zone_occupied[i] ? 1 : 0;
-            esp_zb_zcl_set_attribute_val(ZB_EP_ZONE(i),
+    if (occupied != s_last_occupied) {
+        if (!occupied) {
+            /* State went Occupied → Clear: Start cooldown (don't report yet) */
+            if (!s_pending_clear[0]) {
+                s_pending_clear[0] = true;
+                s_clear_start_time[0] = current_ticks;
+            }
+        } else {
+            /* State went Clear → Occupied: Cancel pending clear, report immediately */
+            s_pending_clear[0] = false;
+            uint8_t val = 1;
+            esp_zb_zcl_set_attribute_val(ZB_EP_MAIN,
                 ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
                 ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
                 ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
                 &val, false);
-            s_last_zone_occ[i] = state.zone_occupied[i];
+            s_last_occupied = true;
+            s_last_report_time[0] = current_ticks;
+        }
+    }
+
+    /* Check for pending Clear report that has completed cooldown */
+    if (s_pending_clear[0] && !occupied) {
+        if (main_cooldown_ticks == 0 || (current_ticks - s_clear_start_time[0]) >= main_cooldown_ticks) {
+            /* Cooldown complete and still clear - report it */
+            uint8_t val = 0;
+            esp_zb_zcl_set_attribute_val(ZB_EP_MAIN,
+                ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
+                ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
+                &val, false);
+            s_last_occupied = false;
+            s_last_report_time[0] = current_ticks;
+            s_pending_clear[0] = false;
+        }
+    }
+
+    /* EPs 2-6: Per-zone occupancy */
+    for (int i = 0; i < 5; i++) {
+        bool zone_occ = state.zone_occupied[i];
+        uint32_t zone_cooldown_ticks = pdMS_TO_TICKS(cfg.occupancy_cooldown_sec[i + 1] * 1000);
+
+        if (zone_occ != s_last_zone_occ[i]) {
+            if (!zone_occ) {
+                /* State went Occupied → Clear: Start cooldown (don't report yet) */
+                if (!s_pending_clear[i + 1]) {
+                    s_pending_clear[i + 1] = true;
+                    s_clear_start_time[i + 1] = current_ticks;
+                }
+            } else {
+                /* State went Clear → Occupied: Cancel pending clear, report immediately */
+                s_pending_clear[i + 1] = false;
+                uint8_t val = 1;
+                esp_zb_zcl_set_attribute_val(ZB_EP_ZONE(i),
+                    ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
+                    ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                    ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
+                    &val, false);
+                s_last_zone_occ[i] = true;
+                s_last_report_time[i + 1] = current_ticks;
+            }
+        }
+
+        /* Check for pending Clear report that has completed cooldown */
+        if (s_pending_clear[i + 1] && !zone_occ) {
+            if (zone_cooldown_ticks == 0 || (current_ticks - s_clear_start_time[i + 1]) >= zone_cooldown_ticks) {
+                /* Cooldown complete and still clear - report it */
+                uint8_t val = 0;
+                esp_zb_zcl_set_attribute_val(ZB_EP_ZONE(i),
+                    ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
+                    ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                    ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
+                    &val, false);
+                s_last_zone_occ[i] = false;
+                s_last_report_time[i + 1] = current_ticks;
+                s_pending_clear[i + 1] = false;
+            }
         }
     }
 

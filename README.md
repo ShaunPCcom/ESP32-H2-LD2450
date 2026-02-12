@@ -201,6 +201,12 @@ All entities are automatically discovered in Home Assistant via Zigbee2MQTT:
 | `number.ld2450_angle_right` | Numeric | 0-60° | Right angle limit |
 | `select.ld2450_tracking_mode` | Select | Multi/Single | Tracking mode |
 | `switch.ld2450_coord_publishing` | Switch | ON/OFF | Enable coordinate publishing |
+| `number.ld2450_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (main sensor) |
+| `number.ld2450_zone_1_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 1) |
+| `number.ld2450_zone_2_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 2) |
+| `number.ld2450_zone_3_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 3) |
+| `number.ld2450_zone_4_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 4) |
+| `number.ld2450_zone_5_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 5) |
 
 ### Zone Vertices (8 per zone, 40 total)
 
@@ -217,7 +223,7 @@ Each of the 5 zones has 4 polygon vertices (X1, Y1, X2, Y2, X3, Y3, X4, Y4):
 |--------|------|-------------|
 | `button.ld2450_restart` | Button | Restart the device |
 
-**Total**: 59 entities (6 occupancy sensors, 5 config controls, 40 zone vertices, 8 read-only attributes)
+**Total**: 65 entities (6 occupancy sensors, 11 config controls, 40 zone vertices, 8 read-only attributes)
 
 ## Configuration
 
@@ -249,6 +255,12 @@ ld mode multi  # or: ld mode single
 
 # Enable coordinate publishing
 ld coords on
+
+# Set occupancy cooldown (seconds before reporting Clear)
+ld cooldown 10           # Set main sensor cooldown
+ld cooldown zone 1 15    # Set zone 1 cooldown
+ld cooldown zone 2 20    # Set zone 2 cooldown
+ld cooldown all 10       # Set all endpoints to same value
 
 # Bluetooth control
 ld bt off
@@ -288,6 +300,37 @@ ld factory-reset
 - **Single target mode** during setup makes it easier to test one zone at a time (only one person tracked)
 - **Coordinate publishing off** during normal operation reduces network overhead (occupancy is all you need for automations)
 - **Multi-target mode** during operation allows tracking multiple people moving through different zones
+
+### Occupancy Cooldown
+
+The **occupancy cooldown** feature prevents false "unoccupied" reports when someone briefly moves out of sensor view. This reduces chattiness and prevents lights from turning off prematurely.
+
+**How it works:**
+- When occupancy **clears** (no targets detected), a cooldown timer starts
+- The sensor does NOT report "Clear" immediately
+- After the cooldown period expires, if still clear, "Clear" is reported
+- If occupancy returns during the cooldown, the "Clear" report is cancelled (never sent)
+- When occupancy is **detected**, it's always reported immediately (no delay)
+
+**Typical values:**
+- `0 seconds` (default): Immediate reporting, no debouncing
+- `5-10 seconds`: Good for most rooms, prevents brief absences from clearing occupancy
+- `30-60 seconds`: Bathrooms, areas where people may briefly leave sensor view
+- `120+ seconds`: Larger spaces, outdoor areas with intermittent detection
+
+**Example:** With a 10-second cooldown:
+1. Person walks into sensor view → Reports "Occupied" immediately
+2. Person walks behind furniture (out of view) → Cooldown starts, stays "Occupied"
+3. Person returns within 10 seconds → Still "Occupied", cooldown resets
+4. Person leaves room → After 10 seconds, reports "Clear"
+
+**Configuration per endpoint:**
+Each of the 6 endpoints (main + 5 zones) has its own independent cooldown value. This allows fine-tuning behavior per area:
+- **Bedroom main**: 30s (avoid premature clearing)
+- **Bedroom zone (bed)**: 60s (longer for sleeping area)
+- **Hallway**: 5s (want quick clearing for transit areas)
+- **Bathroom**: 120s (people often move out of view briefly)
+- **Office zone (desk)**: 10s (balance between responsiveness and stability)
 
 ## Examples
 

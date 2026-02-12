@@ -47,6 +47,9 @@ static void print_help(void)
         "  ld angle <left> <right>      (0-90 degrees)\n"
         "  ld bt <on|off>\n"
         "  ld coords <on|off>\n"
+        "  ld cooldown [seconds]        (set main, show all if no value)\n"
+        "  ld cooldown zone <1-5> <sec> (set zone cooldown)\n"
+        "  ld cooldown all <seconds>    (set all endpoints)\n"
         "  ld config\n"
         "  ld nvs                       (test NVS health)\n"
         "  ld reboot\n"
@@ -111,6 +114,10 @@ static void print_config(void)
            cfg.bt_disabled,
            cfg.tracking_mode ? "single" : "multi",
            cfg.publish_coords ? "on" : "off");
+    printf("cooldown: main=%u zone1=%u zone2=%u zone3=%u zone4=%u zone5=%u sec\n",
+           cfg.occupancy_cooldown_sec[0], cfg.occupancy_cooldown_sec[1],
+           cfg.occupancy_cooldown_sec[2], cfg.occupancy_cooldown_sec[3],
+           cfg.occupancy_cooldown_sec[4], cfg.occupancy_cooldown_sec[5]);
 }
 
 static void cli_task(void *arg)
@@ -188,6 +195,88 @@ static void cli_task(void *arg)
                 nvs_config_save_publish_coords(on ? 1 : 0);
                 printf("coords=%s (saved)\n", on ? "on" : "off");
                 continue;
+            }
+
+            if (strcmp(cmd, "cooldown") == 0) {
+                char *arg1 = strtok(NULL, " \t\r\n");
+                if (!arg1) {
+                    /* No arguments - display all values */
+                    nvs_config_t cfg;
+                    if (nvs_config_get(&cfg) == ESP_OK) {
+                        printf("cooldown: main=%u zone1=%u zone2=%u zone3=%u zone4=%u zone5=%u sec\n",
+                               cfg.occupancy_cooldown_sec[0], cfg.occupancy_cooldown_sec[1],
+                               cfg.occupancy_cooldown_sec[2], cfg.occupancy_cooldown_sec[3],
+                               cfg.occupancy_cooldown_sec[4], cfg.occupancy_cooldown_sec[5]);
+                    } else {
+                        printf("cooldown: error reading config\n");
+                    }
+                    continue;
+                }
+
+                /* Check for "zone N value" or "all value" syntax */
+                if (strcmp(arg1, "zone") == 0) {
+                    char *zone_str = strtok(NULL, " \t\r\n");
+                    char *val_str = strtok(NULL, " \t\r\n");
+                    if (!zone_str || !val_str) {
+                        printf("usage: ld cooldown zone <1-5> <seconds>\n");
+                        continue;
+                    }
+                    int zone = atoi(zone_str);
+                    if (zone < 1 || zone > 5) {
+                        printf("zone must be 1-5\n");
+                        continue;
+                    }
+                    uint16_t sec = (uint16_t)atoi(val_str);
+                    if (sec > 300) {
+                        printf("cooldown must be 0-300 seconds\n");
+                        continue;
+                    }
+                    esp_err_t err = nvs_config_save_occupancy_cooldown((uint8_t)zone, sec);
+                    if (err == ESP_OK) {
+                        printf("zone%d cooldown=%u sec (saved)\n", zone, sec);
+                    } else {
+                        printf("zone%d cooldown=%u sec BUT NVS SAVE FAILED: %s\n", zone, sec, esp_err_to_name(err));
+                    }
+                    continue;
+                } else if (strcmp(arg1, "all") == 0) {
+                    char *val_str = strtok(NULL, " \t\r\n");
+                    if (!val_str) {
+                        printf("usage: ld cooldown all <seconds>\n");
+                        continue;
+                    }
+                    uint16_t sec = (uint16_t)atoi(val_str);
+                    if (sec > 300) {
+                        printf("cooldown must be 0-300 seconds\n");
+                        continue;
+                    }
+                    /* Set all 6 endpoints */
+                    bool all_ok = true;
+                    for (uint8_t i = 0; i < 6; i++) {
+                        esp_err_t err = nvs_config_save_occupancy_cooldown(i, sec);
+                        if (err != ESP_OK) {
+                            printf("endpoint %u save FAILED: %s\n", i, esp_err_to_name(err));
+                            all_ok = false;
+                        }
+                    }
+                    if (all_ok) {
+                        printf("all endpoints cooldown=%u sec (saved)\n", sec);
+                    }
+                    continue;
+                } else {
+                    /* Single argument - set main endpoint */
+                    uint16_t sec = (uint16_t)atoi(arg1);
+                    if (sec > 300) {
+                        printf("cooldown must be 0-300 seconds\n");
+                        continue;
+                    }
+                    esp_err_t err = nvs_config_save_occupancy_cooldown(0, sec);
+                    if (err == ESP_OK) {
+                        printf("main cooldown=%u sec (saved)\n", sec);
+                    } else {
+                        printf("main cooldown=%u sec BUT NVS SAVE FAILED: %s\n", sec, esp_err_to_name(err));
+                    }
+                    continue;
+                }
             }
 
             if (strcmp(cmd, "maxdist") == 0) {
