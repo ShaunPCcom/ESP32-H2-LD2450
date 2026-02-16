@@ -716,7 +716,15 @@ static void zigbee_task(void *pv)
     esp_zb_core_action_handler_register(action_handler);
 
     zigbee_register_endpoints();
-    ESP_ERROR_CHECK(esp_zb_start(false));
+
+    /* Start Zigbee stack with graceful error handling - avoid reboot on network failure */
+    esp_err_t err = esp_zb_start(false);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Zigbee start failed: %s, continuing in pairing mode...", esp_err_to_name(err));
+        board_led_set_state(BOARD_LED_NOT_JOINED);  /* Show pairing state */
+        /* Don't abort - let signal handler retry steering */
+    }
+    /* Continue to main loop regardless - steering retry will handle network connection */
     esp_zb_stack_main_loop();
 }
 
