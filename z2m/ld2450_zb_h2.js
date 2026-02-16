@@ -334,9 +334,9 @@ const definition = {
         await ep1.bind('ld2450Config', coordinatorEndpoint);
         await ep1.configureReporting('ld2450Config', [
             {attribute: 'targetCount', minimumReportInterval: 0,
-             maximumReportInterval: 60, reportableChange: 1},
+             maximumReportInterval: 300, reportableChange: 1},
             {attribute: 'targetCoords', minimumReportInterval: 0,
-             maximumReportInterval: 5},
+             maximumReportInterval: 300},
         ]);
         await ep1.read('ld2450Config', [
             'targetCount', 'targetCoords', 'maxDistance', 'angleLeft', 'angleRight',
