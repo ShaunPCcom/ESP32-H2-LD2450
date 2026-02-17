@@ -36,6 +36,7 @@ const ld2450ConfigCluster = {
         trackingMode:       {ID: 0x0020, type: ZCL_UINT8, write: true},
         coordPublishing:    {ID: 0x0021, type: ZCL_UINT8, write: true},
         occupancyCooldown:  {ID: 0x0022, type: ZCL_UINT16, write: true},
+        occupancyDelay:     {ID: 0x0023, type: ZCL_UINT16, write: true},
         restart:            {ID: 0x00F0, type: ZCL_UINT8, write: true},
     },
     commands: {},
@@ -49,6 +50,7 @@ const ld2450ZoneCluster = {
             ZONE_ATTR_NAMES.map((name, i) => [name, {ID: i, type: ZCL_INT16, write: true, report: true}])
         ),
         occupancyCooldown: {ID: 0x0022, type: ZCL_UINT16, write: true},
+        occupancyDelay:    {ID: 0x0023, type: ZCL_UINT16, write: true},
     },
     commands: {},
     commandsResponse: {},
@@ -113,6 +115,9 @@ const fzLocal = {
             if (d.occupancyCooldown !== undefined) {
                 result.occupancy_cooldown = d.occupancyCooldown;
             }
+            if (d.occupancyDelay !== undefined) {
+                result.occupancy_delay = d.occupancyDelay;
+            }
 
             if (d.targetCoords !== undefined) {
                 const str = d.targetCoords || '';
@@ -148,6 +153,9 @@ const fzLocal = {
             if (msg.data.occupancyCooldown !== undefined) {
                 result[`zone_${zone}_occupancy_cooldown`] = msg.data.occupancyCooldown;
             }
+            if (msg.data.occupancyDelay !== undefined) {
+                result[`zone_${zone}_occupancy_delay`] = msg.data.occupancyDelay;
+            }
             return result;
         },
     },
@@ -157,18 +165,29 @@ const fzLocal = {
 
 const tzLocal = {
     config: {
-        key: ['max_distance', 'angle_left', 'angle_right', 'tracking_mode', 'coord_publishing', 'occupancy_cooldown',
+        key: ['max_distance', 'angle_left', 'angle_right', 'tracking_mode', 'coord_publishing', 'occupancy_cooldown', 'occupancy_delay',
               'zone_1_occupancy_cooldown', 'zone_2_occupancy_cooldown', 'zone_3_occupancy_cooldown',
-              'zone_4_occupancy_cooldown', 'zone_5_occupancy_cooldown'],
+              'zone_4_occupancy_cooldown', 'zone_5_occupancy_cooldown',
+              'zone_1_occupancy_delay', 'zone_2_occupancy_delay', 'zone_3_occupancy_delay',
+              'zone_4_occupancy_delay', 'zone_5_occupancy_delay'],
         convertSet: async (entity, key, value, meta) => {
             registerCustomClusters(meta.device);
 
             /* Check if this is a zone cooldown */
-            const zoneMatch = key.match(/^zone_(\d)_occupancy_cooldown$/);
-            if (zoneMatch) {
-                const zone = parseInt(zoneMatch[1]);
+            const zoneCooldownMatch = key.match(/^zone_(\d)_occupancy_cooldown$/);
+            if (zoneCooldownMatch) {
+                const zone = parseInt(zoneCooldownMatch[1]);
                 const ep = meta.device.getEndpoint(zone + 1);
                 await ep.write('ld2450Zone', {occupancyCooldown: value});
+                return {state: {[key]: value}};
+            }
+
+            /* Check if this is a zone delay */
+            const zoneDelayMatch = key.match(/^zone_(\d)_occupancy_delay$/);
+            if (zoneDelayMatch) {
+                const zone = parseInt(zoneDelayMatch[1]);
+                const ep = meta.device.getEndpoint(zone + 1);
+                await ep.write('ld2450Zone', {occupancyDelay: value});
                 return {state: {[key]: value}};
             }
 
@@ -181,6 +200,7 @@ const tzLocal = {
                 tracking_mode:       {attr: 'trackingMode',       val: (v) => v ? 0 : 1},
                 coord_publishing:    {attr: 'coordPublishing',    val: (v) => v ? 1 : 0},
                 occupancy_cooldown:  {attr: 'occupancyCooldown',  val: (v) => v},
+                occupancy_delay:     {attr: 'occupancyDelay',     val: (v) => v},
             };
             const m = map[key];
             await ep.write('ld2450Config', {[m.attr]: m.val(value)});
@@ -190,11 +210,20 @@ const tzLocal = {
             registerCustomClusters(meta.device);
 
             /* Check if this is a zone cooldown */
-            const zoneMatch = key.match(/^zone_(\d)_occupancy_cooldown$/);
-            if (zoneMatch) {
-                const zone = parseInt(zoneMatch[1]);
+            const zoneCooldownMatch = key.match(/^zone_(\d)_occupancy_cooldown$/);
+            if (zoneCooldownMatch) {
+                const zone = parseInt(zoneCooldownMatch[1]);
                 const ep = meta.device.getEndpoint(zone + 1);
                 await ep.read('ld2450Zone', ['occupancyCooldown']);
+                return;
+            }
+
+            /* Check if this is a zone delay */
+            const zoneDelayMatch = key.match(/^zone_(\d)_occupancy_delay$/);
+            if (zoneDelayMatch) {
+                const zone = parseInt(zoneDelayMatch[1]);
+                const ep = meta.device.getEndpoint(zone + 1);
+                await ep.read('ld2450Zone', ['occupancyDelay']);
                 return;
             }
 
@@ -204,6 +233,7 @@ const tzLocal = {
                 max_distance: 'maxDistance', angle_left: 'angleLeft',
                 angle_right: 'angleRight', tracking_mode: 'trackingMode',
                 coord_publishing: 'coordPublishing', occupancy_cooldown: 'occupancyCooldown',
+                occupancy_delay: 'occupancyDelay',
             };
             await ep.read('ld2450Config', [attrs[key]]);
         },
@@ -281,9 +311,17 @@ const exposesDefinition = [
     numericExpose('occupancy_cooldown', 'Occupancy cooldown', ACCESS_ALL,
         'Minimum time before reporting Clear (main sensor)', {unit: 's', value_min: 0, value_max: 300, value_step: 1}),
 
+    numericExpose('occupancy_delay', 'Occupancy delay', ACCESS_ALL,
+        'Delay before reporting Occupied (main sensor)', {unit: 'ms', value_min: 0, value_max: 65535, value_step: 1}),
+
     ...Array.from({length: 5}, (_, i) =>
         numericExpose(`zone_${i + 1}_occupancy_cooldown`, `Zone ${i + 1} occupancy cooldown`, ACCESS_ALL,
             `Minimum time before reporting Clear (zone ${i + 1})`, {unit: 's', value_min: 0, value_max: 300, value_step: 1})
+    ),
+
+    ...Array.from({length: 5}, (_, i) =>
+        numericExpose(`zone_${i + 1}_occupancy_delay`, `Zone ${i + 1} occupancy delay`, ACCESS_ALL,
+            `Delay before reporting Occupied (zone ${i + 1})`, {unit: 'ms', value_min: 0, value_max: 65535, value_step: 1})
     ),
 
     enumExpose('restart', 'Restart', ACCESS_SET, ['restart'],
@@ -340,7 +378,7 @@ const definition = {
         ]);
         await ep1.read('ld2450Config', [
             'targetCount', 'targetCoords', 'maxDistance', 'angleLeft', 'angleRight',
-            'trackingMode', 'coordPublishing', 'occupancyCooldown',
+            'trackingMode', 'coordPublishing', 'occupancyCooldown', 'occupancyDelay',
         ]);
 
         for (let z = 0; z < 5; z++) {
@@ -351,7 +389,7 @@ const definition = {
                  maximumReportInterval: 300, reportableChange: 0},
             ]);
             await ep.bind('ld2450Zone', coordinatorEndpoint);
-            await ep.read('ld2450Zone', [...ZONE_ATTR_NAMES, 'occupancyCooldown']);
+            await ep.read('ld2450Zone', [...ZONE_ATTR_NAMES, 'occupancyCooldown', 'occupancyDelay']);
         }
     },
 };

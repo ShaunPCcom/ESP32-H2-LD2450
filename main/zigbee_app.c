@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -48,6 +49,10 @@ static char s_last_coords[64] = {0};
 static uint32_t s_last_report_time[6] = {0};
 static bool s_pending_clear[6] = {false};      /* tracking pending Clear reports */
 static uint32_t s_clear_start_time[6] = {0};  /* when Clear was first detected */
+
+/* ---- Occupancy delay tracking (per endpoint: 0=main, 1-5=zones) ---- */
+static bool s_pending_occupied[6] = {false};      /* tracking pending Occupied reports */
+static int64_t s_occupied_start_time[6] = {0};   /* when Occupied was first detected (microseconds) */
 
 /* ---- Forward declarations ---- */
 static void sensor_poll_cb(uint8_t param);
@@ -102,6 +107,7 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     uint8_t init_mode = cfg.tracking_mode;
     uint8_t init_coords = cfg.publish_coords;
     uint16_t init_cooldown = cfg.occupancy_cooldown_sec[0];
+    uint16_t init_delay = cfg.occupancy_delay_ms[0];
 
     /* ZCL char-string: first byte = length, rest = chars. Empty string = "\x00" */
     char empty_str[2] = {0x00, 0x00};
@@ -145,6 +151,11 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
         ESP_ZB_ZCL_ATTR_TYPE_U16,
         ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
         &init_cooldown);
+
+    esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_OCCUPANCY_DELAY,
+        ESP_ZB_ZCL_ATTR_TYPE_U16,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        &init_delay);
 
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_RESTART,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
@@ -221,6 +232,13 @@ static esp_zb_cluster_list_t *create_zone_ep_clusters(uint8_t zone_idx)
         ESP_ZB_ZCL_ATTR_TYPE_U16,
         ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
         &zone_cooldown);
+
+    /* Add occupancy delay attribute for this zone */
+    uint16_t zone_delay = cfg.occupancy_delay_ms[zone_idx + 1];
+    esp_zb_custom_cluster_add_custom_attr(zone_custom, ZB_ATTR_OCCUPANCY_DELAY,
+        ESP_ZB_ZCL_ATTR_TYPE_U16,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        &zone_delay);
 
     /* Assemble cluster list */
     esp_zb_cluster_list_t *cl = esp_zb_zcl_cluster_list_create();
@@ -347,6 +365,15 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
             ESP_LOGI(TAG, "Main occupancy cooldown -> %u sec%s", sec, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
             return ESP_OK;
         }
+        case ZB_ATTR_OCCUPANCY_DELAY: {
+            uint16_t ms = *(uint16_t *)val;
+            esp_err_t err = nvs_config_save_occupancy_delay(0, ms);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save main occupancy_delay to NVS: %s", esp_err_to_name(err));
+            }
+            ESP_LOGI(TAG, "Main occupancy delay -> %u ms%s", ms, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            return ESP_OK;
+        }
         case ZB_ATTR_RESTART:
             ESP_LOGI(TAG, "Restart requested via Zigbee, restarting in 1s...");
             /* Delay so the ZCL Write Attributes Response is sent before we reset.
@@ -372,6 +399,17 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
                 ESP_LOGE(TAG, "Failed to save zone %d occupancy_cooldown to NVS: %s", zone_idx + 1, esp_err_to_name(err));
             }
             ESP_LOGI(TAG, "Zone %d occupancy cooldown -> %u sec%s", zone_idx + 1, sec, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            return ESP_OK;
+        }
+
+        /* Zone occupancy delay writes */
+        if (attr_id == ZB_ATTR_OCCUPANCY_DELAY) {
+            uint16_t ms = *(uint16_t *)val;
+            esp_err_t err = nvs_config_save_occupancy_delay(zone_idx + 1, ms);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save zone %d occupancy_delay to NVS: %s", zone_idx + 1, esp_err_to_name(err));
+            }
+            ESP_LOGI(TAG, "Zone %d occupancy delay -> %u ms%s", zone_idx + 1, ms, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
             return ESP_OK;
         }
 
@@ -467,21 +505,35 @@ static void sensor_poll_cb(uint8_t param)
     nvs_config_t cfg;
     nvs_config_get(&cfg);
     uint32_t current_ticks = xTaskGetTickCount();
+    int64_t current_time_us = esp_timer_get_time();
 
     /* EP 1: Overall occupancy */
     bool occupied = state.occupied_global;
     uint32_t main_cooldown_ticks = pdMS_TO_TICKS(cfg.occupancy_cooldown_sec[0] * 1000);
+    int64_t main_delay_us = cfg.occupancy_delay_ms[0] * 1000LL;
 
     if (occupied != s_last_occupied) {
         if (!occupied) {
-            /* State went Occupied → Clear: Start cooldown (don't report yet) */
+            /* State went Occupied → Clear: Cancel pending occupied, start cooldown */
+            s_pending_occupied[0] = false;
             if (!s_pending_clear[0]) {
                 s_pending_clear[0] = true;
                 s_clear_start_time[0] = current_ticks;
             }
         } else {
-            /* State went Clear → Occupied: Cancel pending clear, report immediately */
+            /* State went Clear → Occupied: Cancel pending clear, start delay timer */
             s_pending_clear[0] = false;
+            if (!s_pending_occupied[0]) {
+                s_pending_occupied[0] = true;
+                s_occupied_start_time[0] = current_time_us;
+            }
+        }
+    }
+
+    /* Check for pending Occupied report that has completed delay */
+    if (s_pending_occupied[0] && occupied) {
+        if (main_delay_us == 0 || (current_time_us - s_occupied_start_time[0]) >= main_delay_us) {
+            /* Delay complete and still occupied - report it */
             uint8_t val = 1;
             esp_zb_zcl_set_attribute_val(ZB_EP_MAIN,
                 ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
@@ -490,6 +542,7 @@ static void sensor_poll_cb(uint8_t param)
                 &val, false);
             s_last_occupied = true;
             s_last_report_time[0] = current_ticks;
+            s_pending_occupied[0] = false;
         }
     }
 
@@ -513,17 +566,30 @@ static void sensor_poll_cb(uint8_t param)
     for (int i = 0; i < 5; i++) {
         bool zone_occ = state.zone_occupied[i];
         uint32_t zone_cooldown_ticks = pdMS_TO_TICKS(cfg.occupancy_cooldown_sec[i + 1] * 1000);
+        int64_t zone_delay_us = cfg.occupancy_delay_ms[i + 1] * 1000LL;
 
         if (zone_occ != s_last_zone_occ[i]) {
             if (!zone_occ) {
-                /* State went Occupied → Clear: Start cooldown (don't report yet) */
+                /* State went Occupied → Clear: Cancel pending occupied, start cooldown */
+                s_pending_occupied[i + 1] = false;
                 if (!s_pending_clear[i + 1]) {
                     s_pending_clear[i + 1] = true;
                     s_clear_start_time[i + 1] = current_ticks;
                 }
             } else {
-                /* State went Clear → Occupied: Cancel pending clear, report immediately */
+                /* State went Clear → Occupied: Cancel pending clear, start delay timer */
                 s_pending_clear[i + 1] = false;
+                if (!s_pending_occupied[i + 1]) {
+                    s_pending_occupied[i + 1] = true;
+                    s_occupied_start_time[i + 1] = current_time_us;
+                }
+            }
+        }
+
+        /* Check for pending Occupied report that has completed delay */
+        if (s_pending_occupied[i + 1] && zone_occ) {
+            if (zone_delay_us == 0 || (current_time_us - s_occupied_start_time[i + 1]) >= zone_delay_us) {
+                /* Delay complete and still occupied - report it */
                 uint8_t val = 1;
                 esp_zb_zcl_set_attribute_val(ZB_EP_ZONE(i),
                     ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
@@ -532,6 +598,7 @@ static void sensor_poll_cb(uint8_t param)
                     &val, false);
                 s_last_zone_occ[i] = true;
                 s_last_report_time[i + 1] = current_ticks;
+                s_pending_occupied[i + 1] = false;
             }
         }
 

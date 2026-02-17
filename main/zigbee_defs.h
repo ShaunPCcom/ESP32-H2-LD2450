@@ -27,6 +27,7 @@
 #define ZB_ATTR_TRACKING_MODE          0x0020  /* U8, read-write (0=multi, 1=single) */
 #define ZB_ATTR_COORD_PUBLISHING       0x0021  /* U8, read-write (0=off, 1=on) */
 #define ZB_ATTR_OCCUPANCY_COOLDOWN     0x0022  /* U16, read-write (0-300 seconds) */
+#define ZB_ATTR_OCCUPANCY_DELAY        0x0023  /* U16, read-write (0-65535 milliseconds) */
 #define ZB_ATTR_RESTART                0x00F0  /* U8, write-only (write any value) */
 
 /* ---- Attributes on ZB_CLUSTER_LD2450_ZONE (EP 2-6) ---- */

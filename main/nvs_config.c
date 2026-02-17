@@ -28,6 +28,7 @@ static const nvs_config_t DEFAULT_CONFIG = {
         { .enabled = false, .v = {{0,0},{0,0},{0,0},{0,0}} },
     },
     .occupancy_cooldown_sec = {0, 0, 0, 0, 0, 0},  /* No cooldown by default for all endpoints */
+    .occupancy_delay_ms = {250, 250, 250, 250, 250, 250},  /* 250ms delay by default for all endpoints */
 };
 
 static esp_err_t nvs_save_u8(const char *key, uint8_t val)
@@ -112,6 +113,10 @@ esp_err_t nvs_config_init(void)
         }
     }
 
+    /* Load occupancy delay */
+    size_t delay_len = sizeof(s_cfg.occupancy_delay_ms);
+    nvs_get_blob(h, "occ_delay", s_cfg.occupancy_delay_ms, &delay_len);
+
     nvs_close(h);
 
     ESP_LOGI(TAG, "Config loaded: dist=%u left=%u right=%u bt_off=%u mode=%u coords=%u",
@@ -184,4 +189,11 @@ esp_err_t nvs_config_save_occupancy_cooldown(uint8_t endpoint_index, uint16_t se
     if (sec > 300) sec = 300;
     s_cfg.occupancy_cooldown_sec[endpoint_index] = sec;
     return nvs_save_blob("occ_cool", s_cfg.occupancy_cooldown_sec, sizeof(s_cfg.occupancy_cooldown_sec));
+}
+
+esp_err_t nvs_config_save_occupancy_delay(uint8_t endpoint_index, uint16_t ms)
+{
+    if (endpoint_index >= 6) return ESP_ERR_INVALID_ARG;
+    s_cfg.occupancy_delay_ms[endpoint_index] = ms;
+    return nvs_save_blob("occ_delay", s_cfg.occupancy_delay_ms, sizeof(s_cfg.occupancy_delay_ms));
 }

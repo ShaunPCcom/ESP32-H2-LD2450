@@ -50,6 +50,9 @@ static void print_help(void)
         "  ld cooldown [seconds]        (set main, show all if no value)\n"
         "  ld cooldown zone <1-5> <sec> (set zone cooldown)\n"
         "  ld cooldown all <seconds>    (set all endpoints)\n"
+        "  ld delay [milliseconds]      (set main, show all if no value)\n"
+        "  ld delay zone <1-5> <ms>     (set zone delay)\n"
+        "  ld delay all <milliseconds>  (set all endpoints)\n"
         "  ld config\n"
         "  ld nvs                       (test NVS health)\n"
         "  ld reboot\n"
@@ -118,6 +121,10 @@ static void print_config(void)
            cfg.occupancy_cooldown_sec[0], cfg.occupancy_cooldown_sec[1],
            cfg.occupancy_cooldown_sec[2], cfg.occupancy_cooldown_sec[3],
            cfg.occupancy_cooldown_sec[4], cfg.occupancy_cooldown_sec[5]);
+    printf("delay: main=%u zone1=%u zone2=%u zone3=%u zone4=%u zone5=%u ms\n",
+           cfg.occupancy_delay_ms[0], cfg.occupancy_delay_ms[1],
+           cfg.occupancy_delay_ms[2], cfg.occupancy_delay_ms[3],
+           cfg.occupancy_delay_ms[4], cfg.occupancy_delay_ms[5]);
 }
 
 static void cli_task(void *arg)
@@ -274,6 +281,76 @@ static void cli_task(void *arg)
                         printf("main cooldown=%u sec (saved)\n", sec);
                     } else {
                         printf("main cooldown=%u sec BUT NVS SAVE FAILED: %s\n", sec, esp_err_to_name(err));
+                    }
+                    continue;
+                }
+            }
+
+            if (strcmp(cmd, "delay") == 0) {
+                char *arg1 = strtok(NULL, " \t\r\n");
+                if (!arg1) {
+                    /* No arguments - display all values */
+                    nvs_config_t cfg;
+                    if (nvs_config_get(&cfg) == ESP_OK) {
+                        printf("delay: main=%u zone1=%u zone2=%u zone3=%u zone4=%u zone5=%u ms\n",
+                               cfg.occupancy_delay_ms[0], cfg.occupancy_delay_ms[1],
+                               cfg.occupancy_delay_ms[2], cfg.occupancy_delay_ms[3],
+                               cfg.occupancy_delay_ms[4], cfg.occupancy_delay_ms[5]);
+                    } else {
+                        printf("delay: error reading config\n");
+                    }
+                    continue;
+                }
+
+                /* Check for "zone N value" or "all value" syntax */
+                if (strcmp(arg1, "zone") == 0) {
+                    char *zone_str = strtok(NULL, " \t\r\n");
+                    char *val_str = strtok(NULL, " \t\r\n");
+                    if (!zone_str || !val_str) {
+                        printf("usage: ld delay zone <1-5> <milliseconds>\n");
+                        continue;
+                    }
+                    int zone = atoi(zone_str);
+                    if (zone < 1 || zone > 5) {
+                        printf("zone must be 1-5\n");
+                        continue;
+                    }
+                    uint16_t ms = (uint16_t)atoi(val_str);
+                    esp_err_t err = nvs_config_save_occupancy_delay((uint8_t)zone, ms);
+                    if (err == ESP_OK) {
+                        printf("zone%d delay=%u ms (saved)\n", zone, ms);
+                    } else {
+                        printf("zone%d delay=%u ms BUT NVS SAVE FAILED: %s\n", zone, ms, esp_err_to_name(err));
+                    }
+                    continue;
+                } else if (strcmp(arg1, "all") == 0) {
+                    char *val_str = strtok(NULL, " \t\r\n");
+                    if (!val_str) {
+                        printf("usage: ld delay all <milliseconds>\n");
+                        continue;
+                    }
+                    uint16_t ms = (uint16_t)atoi(val_str);
+                    /* Set all 6 endpoints */
+                    bool all_ok = true;
+                    for (uint8_t i = 0; i < 6; i++) {
+                        esp_err_t err = nvs_config_save_occupancy_delay(i, ms);
+                        if (err != ESP_OK) {
+                            printf("endpoint %u save FAILED: %s\n", i, esp_err_to_name(err));
+                            all_ok = false;
+                        }
+                    }
+                    if (all_ok) {
+                        printf("all endpoints delay=%u ms (saved)\n", ms);
+                    }
+                    continue;
+                } else {
+                    /* Single argument - set main endpoint */
+                    uint16_t ms = (uint16_t)atoi(arg1);
+                    esp_err_t err = nvs_config_save_occupancy_delay(0, ms);
+                    if (err == ESP_OK) {
+                        printf("main delay=%u ms (saved)\n", ms);
+                    } else {
+                        printf("main delay=%u ms BUT NVS SAVE FAILED: %s\n", ms, esp_err_to_name(err));
                     }
                     continue;
                 }
