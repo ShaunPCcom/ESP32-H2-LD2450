@@ -44,4 +44,5 @@
 /* ---- Identity strings ---- */
 #define ZB_MANUFACTURER_NAME           "\x07""LD2450Z"   /* ZCL string: len byte + chars */
 #define ZB_MODEL_IDENTIFIER            "\x09""LD2450-H2"
+#define ZB_FW_VERSION_STR              "1.0.0.2"          /* Plain string for logging */
 #define ZB_SW_BUILD_ID                 "\x07""1.0.0.2"  /* Must match OTA current_file_version */
