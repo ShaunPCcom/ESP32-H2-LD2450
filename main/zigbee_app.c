@@ -173,7 +173,7 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     zigbee_ota_config_t ota_cfg = ZIGBEE_OTA_CONFIG_DEFAULT();
     ota_cfg.manufacturer_code = 0x131B;  /* Espressif */
     ota_cfg.image_type = 0x0001;         /* LD2450 application */
-    ota_cfg.current_file_version = 0x00010004;  /* v1.0.0.4 */
+    ota_cfg.current_file_version = 0x00010001;  /* v1.0.1 (3-part semantic versioning) */
     ota_cfg.hw_version = 1;
     ota_cfg.query_interval_minutes = 1440;  /* Check every 24 hours */
     ESP_ERROR_CHECK(zigbee_ota_init(cl, ZB_EP_MAIN, &ota_cfg));
@@ -189,6 +189,10 @@ static esp_zb_cluster_list_t *create_zone_ep_clusters(uint8_t zone_idx)
         .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_DC_SOURCE,
     };
     esp_zb_attribute_list_t *basic = esp_zb_basic_cluster_create(&basic_cfg);
+    esp_zb_basic_cluster_add_attr(basic,
+        ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, (void *)ZB_MANUFACTURER_NAME);
+    esp_zb_basic_cluster_add_attr(basic,
+        ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, (void *)ZB_MODEL_IDENTIFIER);
 
     /* Identify cluster */
     esp_zb_identify_cluster_cfg_t identify_cfg = {
