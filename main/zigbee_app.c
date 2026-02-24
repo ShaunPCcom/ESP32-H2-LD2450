@@ -194,6 +194,8 @@ static esp_zb_cluster_list_t *create_zone_ep_clusters(uint8_t zone_idx)
         ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, (void *)ZB_MANUFACTURER_NAME);
     esp_zb_basic_cluster_add_attr(basic,
         ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, (void *)ZB_MODEL_IDENTIFIER);
+    esp_zb_basic_cluster_add_attr(basic,
+        ESP_ZB_ZCL_ATTR_BASIC_SW_BUILD_ID, (void *)ZB_SW_BUILD_ID);
 
     /* Identify cluster */
     esp_zb_identify_cluster_cfg_t identify_cfg = {
