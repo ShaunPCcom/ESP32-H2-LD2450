@@ -16,6 +16,13 @@ typedef enum {
 void board_led_init(void);
 void board_led_set_state(board_led_state_t state);
 
+/* C wrappers for C++ BoardLed API (called from zigbee_app.c) */
+void board_led_set_state_off(void);
+void board_led_set_state_not_joined(void);
+void board_led_set_state_pairing(void);
+void board_led_set_state_joined(void);
+void board_led_set_state_error(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,6 +1,6 @@
 idf_component_register(
     SRCS
-        "ld2450_zb_h2.c"
+        "main.cpp"
         "ld2450_cli.c"
         "zigbee_app.c"
         "board_led.c"

@@ -51,26 +51,33 @@ jobs:
 
       - name: Validate version in code
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          FILE_VERSION_HEX="${{ steps.version.outputs.file_version_hex }}"
+          MAJOR="${{ steps.version.outputs.major }}"
+          MINOR="${{ steps.version.outputs.minor }}"
+          PATCH="${{ steps.version.outputs.patch }}"
 
-          # Check zigbee_app.c for OTA version
-          if ! grep -q "current_file_version = ${FILE_VERSION_HEX}" main/zigbee_app.c; then
-            echo "❌ ERROR: Version mismatch in main/zigbee_app.c"
-            echo "Expected: current_file_version = ${FILE_VERSION_HEX}"
-            echo "Please update main/zigbee_app.c to match tag ${GITHUB_REF#refs/tags/}"
+          # Check version.h for derived version macros (single source of truth)
+          if ! grep -q "#define FW_VERSION_MAJOR ${MAJOR}" main/version.h; then
+            echo "❌ ERROR: FW_VERSION_MAJOR mismatch in main/version.h"
+            echo "Expected: #define FW_VERSION_MAJOR ${MAJOR}"
+            echo "Please update main/version.h to match tag ${GITHUB_REF#refs/tags/}"
             exit 1
           fi
 
-          # Check zigbee_defs.h for SW_BUILD_ID
-          if ! grep -q "\"${VERSION}\"" main/zigbee_defs.h; then
-            echo "❌ ERROR: Version mismatch in main/zigbee_defs.h"
-            echo "Expected: ZB_SW_BUILD_ID with \"${VERSION}\""
-            echo "Please update main/zigbee_defs.h to match tag ${GITHUB_REF#refs/tags/}"
+          if ! grep -q "#define FW_VERSION_MINOR ${MINOR}" main/version.h; then
+            echo "❌ ERROR: FW_VERSION_MINOR mismatch in main/version.h"
+            echo "Expected: #define FW_VERSION_MINOR ${MINOR}"
+            echo "Please update main/version.h to match tag ${GITHUB_REF#refs/tags/}"
             exit 1
           fi
 
-          echo "✅ Version validated in code"
+          if ! grep -q "#define FW_VERSION_PATCH ${PATCH}" main/version.h; then
+            echo "❌ ERROR: FW_VERSION_PATCH mismatch in main/version.h"
+            echo "Expected: #define FW_VERSION_PATCH ${PATCH}"
+            echo "Please update main/version.h to match tag ${GITHUB_REF#refs/tags/}"
+            exit 1
+          fi
+
+          echo "✅ Version validated: FW_VERSION_MAJOR=${MAJOR} MINOR=${MINOR} PATCH=${PATCH}"
 
       - name: Install ESP-IDF dependencies
         run: |

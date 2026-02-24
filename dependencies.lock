@@ -1,4 +1,12 @@
 dependencies:
+  board_led:
+    component_hash: 5065611988712140bdc42c815ed2c766c6e9e7bdf4280f1d21ea58c7653ec6fe
+    dependencies: []
+    source:
+      git: https://github.com/ShaunPCcom/esp32-zigbee-common.git
+      path: board_led
+      type: git
+    version: 60a600a433d4e19d6ba88db1e6d0c0aa711992cc
   espressif/esp-zboss-lib:
     component_hash: 321883d142421f65009972408287441794250057668a11abbdfd8bec77c3309a
     dependencies:
@@ -33,6 +41,14 @@ dependencies:
     source:
       type: idf
     version: 5.5.2
+  zigbee_core:
+    component_hash: f553c0adc66c53e9b0140ffc86818a3f7949388d7676466afa9fb1a0d1a84afc
+    dependencies: []
+    source:
+      git: https://github.com/ShaunPCcom/esp32-zigbee-common.git
+      path: zigbee_core
+      type: git
+    version: 60a600a433d4e19d6ba88db1e6d0c0aa711992cc
   zigbee_ota:
     component_hash: 9414a25d4d91774352ee64963c40693a59e2d14fb9da447b5fa9ea76ba1f8c13
     dependencies:
@@ -49,11 +65,13 @@ dependencies:
     - esp32c6
     version: dfcf59bb04d419efbf92cba75e55b8b7a2db9a89
 direct_dependencies:
+- board_led
 - espressif/esp-zboss-lib
 - espressif/esp-zigbee-lib
 - espressif/led_strip
 - idf
+- zigbee_core
 - zigbee_ota
-manifest_hash: 0f5058b7dbfa67ecefe285c0e7d788f3a4bfd0954d9c65bb4959198e2e390f34
+manifest_hash: b23919a5089e7cb882257758e147708476cbfb032fb4a133193480ab0cfbe527
 target: esp32h2
 version: 2.0.0
