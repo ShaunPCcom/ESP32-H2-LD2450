@@ -30,15 +30,17 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-          # Convert version to hex for fileVersion (use clean version for numbers)
-          IFS='.' read -r major minor patch build <<< "$VERSION_CLEAN"
-          if [ -z "$build" ]; then build=0; fi
+          # Convert version to hex for fileVersion (3-part semantic versioning)
+          IFS='.' read -r major minor patch <<< "$VERSION_CLEAN"
 
-          # Calculate hex fileVersion: (major << 16) | (minor << 8) | build
-          # Format: 0x00MMmmBB where MM=major, mm=minor, BB=build (patch unused)
-          file_version_dec=$((major * 65536 + minor * 256 + build))
+          # Calculate hex fileVersion: (major << 16) | (minor << 8) | patch
+          # Format: 0x00MMNNPP where MM=major, NN=minor, PP=patch
+          file_version_dec=$((major * 65536 + minor * 256 + patch))
           file_version=$(printf "0x%08x" $file_version_dec)
 
+          echo "major=${major}" >> $GITHUB_OUTPUT
+          echo "minor=${minor}" >> $GITHUB_OUTPUT
+          echo "patch=${patch}" >> $GITHUB_OUTPUT
           echo "file_version_hex=${file_version}" >> $GITHUB_OUTPUT
           echo "file_version_dec=${file_version_dec}" >> $GITHUB_OUTPUT
 
