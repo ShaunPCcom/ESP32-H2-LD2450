@@ -477,22 +477,25 @@ constexpr uint16_t REPORT_MIN_INTERVAL_SEC = 0;
 constexpr uint16_t REPORT_MAX_INTERVAL_SEC = 300;
 
 /**
- * Default occupancy cooldown time (0 seconds)
+ * Default occupancy cooldown time (1 second)
  *
  * After targets disappear, firmware waits this duration before reporting
  * occupancy = false. Prevents flicker when person briefly obscured or sensor
  * loses tracking momentarily.
  *
- * Why 0 default: Conservative - reports state changes immediately. Users can
- * increase per-endpoint via Zigbee attribute 0xFC00:0x0022 (main) or 0xFC01:0x0022
- * (zones) to reduce automation chatter.
+ * Why 1 second default: Prevents adjacent zone trigger issues (zone transitions
+ * causing light flicker when one zone reports unoccupied before the next reports
+ * occupied). With 250ms occupancy delay, 1s cooldown provides sufficient overlap
+ * for smooth transitions between zones. Users can adjust per-endpoint via Zigbee
+ * attribute 0xFC00:0x0022 (main) or 0xFC01:0x0022 (zones).
  *
- * Typical values: 5-30 seconds for room presence (tolerate brief absence like
- * bending down), 60-300 seconds for room occupancy (tolerate bathroom visit).
+ * Typical values: 1-5 seconds for adjacent zones, 5-30 seconds for room presence
+ * (tolerate brief absence like bending down), 60-300 seconds for room occupancy
+ * (tolerate bathroom visit).
  *
  * Range: 0-300 seconds (5 minutes max). Enforced by NVS storage and Z2M converter.
  */
-constexpr uint16_t OCCUPANCY_COOLDOWN_SEC_DEFAULT = 0;
+constexpr uint16_t OCCUPANCY_COOLDOWN_SEC_DEFAULT = 1;
 
 /**
  * Default occupancy delay time (250 milliseconds)
