@@ -4,6 +4,16 @@ build/
 sdkconfig.old
 managed_components/
 
+# Firmware / linker artifacts
+*.bin
+*.elf
+*.map
+*.hex
+*.ota
+
+# Tooling / indexes
+compile_commands.json
+
 # host_test build outputs
 tools/host_test/test_ld2450_parser
 tools/host_test/test_ld2450_parser_stream
