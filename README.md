@@ -384,7 +384,11 @@ Erases **both** Zigbee network and NVS configuration (zones, max distance, angle
 
 - **Sensor driver**: `components/ld2450/` - UART RX task, protocol parser, zone logic
 - **Command encoder**: `components/ld2450/ld2450_cmd.c` - UART TX, config mode, ACK reader
-- **Zigbee app**: `main/zigbee_app.c` - 6 endpoints, custom clusters, attribute reports
+- **Zigbee modules**:
+  - `main/zigbee_init.c` - Stack setup, endpoint/cluster creation
+  - `main/zigbee_attr_handler.c` - Attribute write dispatch
+  - `main/sensor_bridge.c` - Sensor polling, state tracking, reporting
+  - `main/zigbee_signal_handlers.c` - Network lifecycle, factory reset
 - **NVS persistence**: `main/nvs_config.c` - Load/save all config on boot/change
 - **Z2M converter**: `z2m/ld2450_zb_h2.js` - Custom cluster defs, fromZigbee/toZigbee
 

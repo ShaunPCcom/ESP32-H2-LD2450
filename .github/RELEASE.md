@@ -7,17 +7,16 @@ This project uses automated releases triggered by git tags.
 **To release a new version:**
 
 ```bash
-# 1. Update version in code
-vim main/zigbee_app.c      # Change current_file_version
-vim main/zigbee_defs.h     # Change ZB_SW_BUILD_ID
+# 1. Update version in code (single source of truth)
+vim main/version.h         # Update FW_VERSION_PATCH (or MINOR/MAJOR)
 
 # 2. Commit the version bump
-git commit -am "chore: bump version to v1.0.0.2"
+git commit -am "chore: bump version to v1.1.2"
 git push
 
 # 3. Create and push tag (triggers automation)
-git tag -a v1.0.0.2 -m "Release v1.0.0.2 - Description"
-git push origin v1.0.0.2
+git tag -a v1.1.2 -m "Release v1.1.2 - Description"
+git push origin v1.1.2
 
 # 4. Wait 5-10 minutes - automation handles everything else
 ```
@@ -51,36 +50,27 @@ Examples:
 
 ## Version Update Checklist
 
-Before creating a tag, ensure version is updated in **both** files:
+The project uses a **single source of truth** for version management in `main/version.h`.
 
-### 1. `main/zigbee_app.c`
+### Update `main/version.h`
 
-```c
-zigbee_ota_config_t ota_cfg = ZIGBEE_OTA_CONFIG_DEFAULT();
-ota_cfg.manufacturer_code = 0x131B;
-ota_cfg.image_type = 0x0001;
-ota_cfg.current_file_version = 0x00010002;  // ← Update this (hex)
-```
-
-**Hex conversion**:
-- v1.0.0.2 = `0x00010002`
-- v1.2.3.4 = `0x01020304`
-
-### 2. `main/zigbee_defs.h`
+Simply change the three version numbers:
 
 ```c
-#define ZB_SW_BUILD_ID  "\x07""1.0.0.2"  // ← Update this (string)
+#define FW_VERSION_MAJOR 1
+#define FW_VERSION_MINOR 1
+#define FW_VERSION_PATCH 2  // ← Increment this for bug fixes
 ```
 
-**String format**: Length byte + version string
-- Length = number of characters (e.g., "1.0.0.2" = 7 chars = `\x07`)
+**That's it!** All other version representations are automatically derived:
+- Hex version for OTA: `FIRMWARE_VERSION` (auto-calculated as `0x00MMNNPP`)
+- String version: `FIRMWARE_VERSION_STRING` (auto-generated as `"v1.1.2"`)
+- ZCL string: `FIRMWARE_SW_BUILD_ID` (auto-generated with length byte)
 
-### 3. Optional: Update version banner
-
-If you added a version banner in `zigbee_app.c`:
-```c
-ESP_LOGI(TAG, "LD2450 Firmware Version: v1.0.0.2");  // ← Update
-```
+**Version bump guidelines:**
+- **PATCH** (1.1.1 → 1.1.2): Bug fixes, minor improvements
+- **MINOR** (1.1.2 → 1.2.0): New features, backward compatible
+- **MAJOR** (1.2.0 → 2.0.0): Breaking changes
 
 ## Monitoring the Release
 
@@ -101,24 +91,24 @@ ESP_LOGI(TAG, "LD2450 Firmware Version: v1.0.0.2");  // ← Update
 ### Error: Version mismatch
 
 ```
-❌ ERROR: Version mismatch in main/zigbee_app.c
-Expected: current_file_version = 0x00010002
+❌ ERROR: Version mismatch in main/version.h
+Expected: FW_VERSION_PATCH = 2
 ```
 
 **Fix**: Update the version in code to match your tag, then recreate the tag:
 ```bash
 # Delete the tag
-git tag -d v1.0.0.2
-git push origin :refs/tags/v1.0.0.2
+git tag -d v1.1.2
+git push origin :refs/tags/v1.1.2
 
 # Fix version in code
-vim main/zigbee_app.c main/zigbee_defs.h
+vim main/version.h
 git commit -am "fix: correct version numbers"
 git push
 
 # Recreate tag
-git tag -a v1.0.0.2 -m "Release v1.0.0.2"
-git push origin v1.0.0.2
+git tag -a v1.1.2 -m "Release v1.1.2"
+git push origin v1.1.2
 ```
 
 ### Error: Build failed
@@ -170,8 +160,7 @@ git push
 ## Release Checklist
 
 - [ ] All changes committed and pushed
-- [ ] Version updated in `main/zigbee_app.c` (hex format)
-- [ ] Version updated in `main/zigbee_defs.h` (string format)
+- [ ] Version updated in `main/version.h` (MAJOR/MINOR/PATCH)
 - [ ] Version bump committed
 - [ ] Tag created and pushed
 - [ ] GitHub Actions workflow succeeded (check Actions page)
