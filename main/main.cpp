@@ -11,7 +11,8 @@ extern "C" {
 #include "ld2450_cmd.h"
 #include "ld2450_cli.h"
 #include "nvs_config.h"
-#include "zigbee_app.h"
+#include "zigbee_init.h"
+#include "zigbee_signal_handlers.h"
 }
 
 #include "sdkconfig.h"
@@ -28,9 +29,6 @@ static const char *TAG = "ld2450_main";
 /* Global instances of C++ shared components */
 static BoardLed *g_board_led = nullptr;
 static ButtonHandler *g_button = nullptr;
-
-/* Forward declarations for callbacks */
-extern "C" bool zigbee_is_network_joined(void);
 
 static void apply_saved_config(const nvs_config_t *cfg)
 {
@@ -96,7 +94,7 @@ extern "C" void app_main(void)
     ld2450_cli_start();
 
     /* Zigbee bring-up */
-    zigbee_app_start();
+    zigbee_init();
 
     /* Initialize button handler (C++ ButtonHandler class) */
     g_button = new ButtonHandler(BOARD_BUTTON_GPIO,

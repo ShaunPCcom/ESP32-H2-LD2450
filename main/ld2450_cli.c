@@ -21,7 +21,7 @@
 #include "ld2450.h"
 #include "ld2450_cmd.h"
 #include "nvs_config.h"
-#include "zigbee_app.h"
+#include "zigbee_signal_handlers.h"
 
 static const char *TAG = "ld2450_cli";
 

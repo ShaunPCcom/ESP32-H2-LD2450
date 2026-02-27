@@ -2,9 +2,11 @@ idf_component_register(
     SRCS
         "main.cpp"
         "ld2450_cli.c"
-        "zigbee_app.c"
-        "board_led.c"
         "nvs_config.c"
+        "zigbee_init.c"
+        "zigbee_attr_handler.c"
+        "sensor_bridge.c"
+        "zigbee_signal_handlers.c"
     INCLUDE_DIRS
         "."
     PRIV_REQUIRES
