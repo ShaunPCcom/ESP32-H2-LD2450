@@ -14,8 +14,9 @@ The LD2450 is a 24GHz mmWave radar sensor that tracks up to 3 targets simultaneo
 
 - **3-target tracking**: Real-time X/Y coordinates (mm) for up to 3 moving targets
 - **5 configurable zones**: Define custom quadrilateral presence detection areas (e.g., "couch", "desk", "bed")
-- **Zigbee2MQTT integration**: 59 Home Assistant entities via external converter
+- **Zigbee2MQTT integration**: 75 Home Assistant entities via external converter
 - **OTA firmware updates**: Remote updates via Zigbee2MQTT (dual partition rollback protection)
+- **Crash diagnostic telemetry**: Remote debugging via boot_count, reset_reason, last_uptime, and min_free_heap sensors
 - **NVS persistence**: All configuration survives reboots (independent of coordinator)
 - **Serial CLI**: Configure zones, tracking mode, distance/angle limits over UART
 - **LED status indicator**: WS2812 RGB shows connection state
@@ -191,6 +192,10 @@ All entities are automatically discovered in Home Assistant via Zigbee2MQTT:
 | `binary_sensor.ld2450_zone_3_occupancy` | Binary | Zone 3 occupancy |
 | `binary_sensor.ld2450_zone_4_occupancy` | Binary | Zone 4 occupancy |
 | `binary_sensor.ld2450_zone_5_occupancy` | Binary | Zone 5 occupancy |
+| `sensor.ld2450_boot_count` | Numeric | Total device reboots (monotonic counter) |
+| `sensor.ld2450_reset_reason` | Numeric (0-15) | Last reset cause (1=POWERON, 3=SOFTWARE, 8=BROWNOUT, etc.) |
+| `sensor.ld2450_last_uptime_sec` | Numeric | Uptime in seconds before last reset (0=unknown) |
+| `sensor.ld2450_min_free_heap` | Numeric (bytes) | Minimum free heap memory since boot |
 
 ### Configuration (Read-Write)
 
@@ -267,6 +272,9 @@ ld bt off
 
 # View current config
 ld config
+
+# View crash diagnostics (boot count, reset reason, uptime, heap)
+ld diag
 
 # Test NVS health (diagnostics)
 ld nvs
