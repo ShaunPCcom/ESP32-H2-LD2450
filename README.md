@@ -14,7 +14,7 @@ The LD2450 is a 24GHz mmWave radar sensor that tracks up to 3 targets simultaneo
 
 - **3-target tracking**: Real-time X/Y coordinates (mm) for up to 3 moving targets
 - **5 configurable zones**: Define custom quadrilateral presence detection areas (e.g., "couch", "desk", "bed")
-- **Zigbee2MQTT integration**: 75 Home Assistant entities via external converter
+- **Zigbee2MQTT integration**: 76 Home Assistant entities via external converter
 - **OTA firmware updates**: Remote updates via Zigbee2MQTT (dual partition rollback protection)
 - **Crash diagnostic telemetry**: Remote debugging via boot_count, reset_reason, last_uptime, and min_free_heap sensors
 - **NVS persistence**: All configuration survives reboots (independent of coordinator)
@@ -227,8 +227,9 @@ Each of the 5 zones has 4 polygon vertices (X1, Y1, X2, Y2, X3, Y3, X4, Y4):
 | Entity | Type | Description |
 |--------|------|-------------|
 | `button.ld2450_restart` | Button | Restart the device |
+| `text.ld2450_factory_reset_confirm` | Text | Type `factory-reset` to trigger a full factory reset |
 
-**Total**: 65 entities (6 occupancy sensors, 11 config controls, 40 zone vertices, 8 read-only attributes)
+**Total**: 76 entities (6 occupancy sensors, 11 config controls, 40 zone vertices, 12 read-only attributes, 6 occupancy delays, 1 factory reset)
 
 ## Configuration
 
@@ -407,7 +408,7 @@ Erases **both** Zigbee network and NVS configuration (zones, max distance, angle
 
 ### Custom Clusters
 
-- **0xFC00** (EP 1): Target count, coordinates, max distance, angle, tracking mode, coord publishing, restart
+- **0xFC00** (EP 1): Target count, coordinates, max distance, angle, tracking mode, coord publishing, restart, factory_reset
 - **0xFC01** (EP 2-6): Zone vertices (8 signed 16-bit attributes: X1, Y1, X2, Y2, X3, Y3, X4, Y4)
 
 ## Acknowledgments
