@@ -35,7 +35,7 @@
 #define ZB_ATTR_LAST_UPTIME_SEC        0x0032  /* U32, read-only (uptime before last reset) */
 #define ZB_ATTR_MIN_FREE_HEAP          0x0033  /* U32, read-only (min free heap since boot) */
 
-#define ZB_ATTR_RESTART                0x00F0  /* U8, write-only (write any value) */
+/* ZB_ATTR_RESTART (0x00F0) and ZB_ATTR_FACTORY_RESET (0x00F1) defined in zigbee_ctrl.h */
 
 /* ---- Attributes on ZB_CLUSTER_LD2450_ZONE (EP 2-6) ---- */
 #define ZB_ATTR_ZONE_X1                0x0000  /* S16, read-write (mm) */
@@ -51,6 +51,9 @@
 /* ---- Identity strings ---- */
 #define ZB_MANUFACTURER_NAME           "\x07""LD2450Z"   /* ZCL string: len byte + chars */
 #define ZB_MODEL_IDENTIFIER            "\x09""LD2450-H2"
+
+/* ---- Shared zigbee_ctrl attributes ---- */
+#include "zigbee_ctrl.h"
 
 /* ---- Firmware version (derived from version.h) ---- */
 #include "version.h"

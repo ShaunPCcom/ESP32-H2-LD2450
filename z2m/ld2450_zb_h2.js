@@ -43,6 +43,7 @@ const ld2450ConfigCluster = {
         lastUptimeSec:      {ID: 0x0032, type: ZCL_UINT32, report: false},
         minFreeHeap:        {ID: 0x0033, type: ZCL_UINT32, report: false},
         restart:            {ID: 0x00F0, type: ZCL_UINT8, write: true},
+        factoryReset:       {ID: 0x00F1, type: ZCL_UINT8, write: true},
     },
     commands: {},
     commandsResponse: {},
@@ -264,6 +265,21 @@ const tzLocal = {
             registerCustomClusters(meta.device);
             const ep = meta.device.getEndpoint(1);
             await ep.write('ld2450Config', {restart: 1});
+            return {state: {restart: ''}};
+        },
+    },
+
+    factory_reset: {
+        key: ['factory_reset_confirm'],
+        convertSet: async (entity, key, value, meta) => {
+            if (value !== 'factory-reset') {
+                meta.logger.warn(`[ZB_LD2450] Factory reset not triggered: type "factory-reset" to confirm`);
+                return;
+            }
+            meta.logger.warn(`[ZB_LD2450] Factory reset triggered via Z2M`);
+            registerCustomClusters(meta.device);
+            const ep = meta.device.getEndpoint(1);
+            await ep.write('ld2450Config', {factoryReset: 0xFE}, {disableDefaultResponse: true});
         },
     },
 
@@ -359,6 +375,9 @@ const exposesDefinition = [
     enumExpose('restart', 'Restart', ACCESS_SET, ['restart'],
         'Restart the device'),
 
+    {type: 'text', name: 'factory_reset_confirm', label: 'Factory reset confirm', property: 'factory_reset_confirm', access: ACCESS_SET,
+        description: 'Type "factory-reset" exactly and press Set to perform a full factory reset. Erases all settings and Zigbee network data.'},
+
     ...Array.from({length: 5}, (_, z) =>
         ZONE_COORD_NAMES.map(c => {
             const axis = c[0].toUpperCase();
@@ -377,7 +396,7 @@ const definition = {
     vendor: 'LD2450Z',
     description: 'HLK-LD2450 mmWave presence sensor (Zigbee, ESP32-H2)',
     fromZigbee: [fzLocal.occupancy, fzLocal.config, fzLocal.zone_vertices],
-    toZigbee: [tzLocal.config, tzLocal.restart, tzLocal.zone_vertices],
+    toZigbee: [tzLocal.config, tzLocal.restart, tzLocal.factory_reset, tzLocal.zone_vertices],
     exposes: exposesDefinition,
     ota: true,  // Enable OTA update support
     meta: {

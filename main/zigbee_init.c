@@ -150,6 +150,12 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
         ESP_ZB_ZCL_ATTR_ACCESS_WRITE_ONLY,
         &zero_u8);
 
+    static uint8_t s_factory_reset_attr = 0;
+    esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_FACTORY_RESET,
+        ESP_ZB_ZCL_ATTR_TYPE_U8,
+        ESP_ZB_ZCL_ATTR_ACCESS_WRITE_ONLY,
+        &s_factory_reset_attr);
+
     /* Assemble cluster list */
     esp_zb_cluster_list_t *cl = esp_zb_zcl_cluster_list_create();
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_basic_cluster(cl, basic, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));

@@ -10,6 +10,7 @@
 #include "ld2450_cmd.h"
 #include "nvs_config.h"
 #include "zigbee_attr_handler.h"
+#include "zigbee_ctrl.h"
 #include "zigbee_defs.h"
 #include "zigbee_ota.h"
 
@@ -106,11 +107,14 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
             return ESP_OK;
         }
         case ZB_ATTR_RESTART:
-            ESP_LOGI(TAG, "Restart requested via Zigbee, restarting in 1s...");
-            /* Delay so the ZCL Write Attributes Response is sent before we reset.
-             * Without this, Z2M retries the write after reconnect → double reboot. */
-            esp_zb_scheduler_alarm((esp_zb_callback_t)esp_restart, 0, 1000);
+            zgb_ctrl_handle_restart();
             return ESP_OK;
+
+        case ZB_ATTR_FACTORY_RESET: {
+            extern void zigbee_full_factory_reset(void);
+            zgb_ctrl_handle_factory_reset(*(uint8_t *)val, zigbee_full_factory_reset);
+            return ESP_OK;
+        }
         default:
             break;
         }
