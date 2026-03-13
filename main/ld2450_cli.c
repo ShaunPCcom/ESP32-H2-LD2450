@@ -100,7 +100,7 @@ static void print_zones(void)
     for (int i = 0; i < 5; i++) {
         printf("zone%d: %s  v=[(%d,%d) (%d,%d) (%d,%d) (%d,%d)] mm\n",
                i + 1,
-               z[i].enabled ? "on " : "off",
+               z[i].vertex_count >= 3 ? "on " : "off",
                (int)z[i].v[0].x_mm, (int)z[i].v[0].y_mm,
                (int)z[i].v[1].x_mm, (int)z[i].v[1].y_mm,
                (int)z[i].v[2].x_mm, (int)z[i].v[2].y_mm,
@@ -434,7 +434,7 @@ static void cli_task(void *arg)
                 ld2450_zone_t z = all[zi];
 
                 if (strcmp(onoff, "off") == 0) {
-                    z.enabled = false;
+                    z.vertex_count = 0;
                     if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {
                         esp_err_t err = nvs_config_save_zone((uint8_t)zi, &z);
                         if (err == ESP_OK) {
@@ -456,7 +456,8 @@ static void cli_task(void *arg)
                 char *coords[8];
                 for (int i = 0; i < 8; i++) coords[i] = strtok(NULL, " \t\r\n");
 
-                z.enabled = true;
+                /* "on" without coords: mark active only if currently disabled */
+                if (z.vertex_count < 4) z.vertex_count = 4;
 
                 if (!coords[0]) {
                     if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {

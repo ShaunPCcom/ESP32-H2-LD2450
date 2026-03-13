@@ -162,7 +162,8 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
             } else {
                 zones[zone_idx].v[vi].y_mm = coord_val;
             }
-            zones[zone_idx].enabled = true;
+            /* vertex_count >= 3 means active; old 4-vertex handler sets 4 */
+            if (zones[zone_idx].vertex_count < 4) zones[zone_idx].vertex_count = 4;
 
             ld2450_set_zone(zone_idx, &zones[zone_idx]);
             esp_err_t err = nvs_config_save_zone(zone_idx, &zones[zone_idx]);

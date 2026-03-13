@@ -19,12 +19,12 @@
 #define ZONE_ID_USER(z) ((z) + 1)
 
 static ld2450_zone_t s_zones[LD2450_ZONE_COUNT] = {
-    // Example placeholders (you will replace these later from HA/Zigbee config)
-    { .enabled=true, .v={{0,500},{500,500},{500,1500},{0,1500}} },     // Zone0
-    { .enabled=false, .v={{0,0},{0,0},{0,0},{0,0}} },                  // Zone1
-    { .enabled=false, .v={{0,0},{0,0},{0,0},{0,0}} },                  // Zone2
-    { .enabled=false, .v={{0,0},{0,0},{0,0},{0,0}} },                  // Zone3
-    { .enabled=false, .v={{0,0},{0,0},{0,0},{0,0}} },                  // Zone4
+    /* vertex_count < 3 = disabled */
+    { .vertex_count = 0 },
+    { .vertex_count = 0 },
+    { .vertex_count = 0 },
+    { .vertex_count = 0 },
+    { .vertex_count = 0 },
 };
 
 static const char *TAG = "ld2450";
@@ -47,9 +47,9 @@ static ld2450_state_t s_state = {0};
 
 static bool zone_vertices_sane(const ld2450_zone_t *z)
 {
-    // Minimal sanity: enabled zones shouldn't be all-zero vertices.
-    if (!z->enabled) return true;
-    for (int i = 0; i < 4; i++) {
+    // Disabled zones are always sane.
+    if (z->vertex_count < 3) return true;
+    for (int i = 0; i < z->vertex_count; i++) {
         if (z->v[i].x_mm != 0 || z->v[i].y_mm != 0) return true;
     }
     return false;
@@ -171,8 +171,7 @@ static void ld2450_uart_task(void *arg)
 
                 if (cfg.enabled && r->occupied) {
                     for (unsigned zi = 0; zi < LD2450_ZONE_COUNT; zi++) {
-                        if (!s_zones[zi].enabled)
-                            continue;
+                        /* ld2450_zone_contains_point returns false when vertex_count < 3 */
 
                         if (cfg.mode == LD2450_TRACK_SINGLE) {
                             ld2450_point_t p = { .x_mm = selected.x_mm, .y_mm = selected.y_mm };

@@ -21,11 +21,11 @@ static const nvs_config_t DEFAULT_CONFIG = {
     .angle_right_deg  = 60,
     .bt_disabled      = 1,     /* BT off by default */
     .zones = {
-        { .enabled = false, .v = {{0,0},{0,0},{0,0},{0,0}} },
-        { .enabled = false, .v = {{0,0},{0,0},{0,0},{0,0}} },
-        { .enabled = false, .v = {{0,0},{0,0},{0,0},{0,0}} },
-        { .enabled = false, .v = {{0,0},{0,0},{0,0},{0,0}} },
-        { .enabled = false, .v = {{0,0},{0,0},{0,0},{0,0}} },
+        { .vertex_count = 0 },
+        { .vertex_count = 0 },
+        { .vertex_count = 0 },
+        { .vertex_count = 0 },
+        { .vertex_count = 0 },
     },
     .occupancy_cooldown_sec = {0, 0, 0, 0, 0, 0},  /* No cooldown by default for all endpoints */
     .occupancy_delay_ms = {250, 250, 250, 250, 250, 250},  /* 250ms delay by default for all endpoints */
