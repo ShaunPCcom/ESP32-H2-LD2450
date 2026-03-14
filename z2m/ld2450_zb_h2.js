@@ -419,14 +419,15 @@ const definition = {
             'trackingMode', 'coordPublishing', 'occupancyCooldown', 'occupancyDelay',
             'bootCount', 'resetReason', 'lastUptimeSec', 'minFreeHeap',
         ]);
-        await ep1.read('ld2450Config',
-            Array.from({length: 10}, (_, n) => [
+        /* Read zone config attrs one zone at a time — 40 attrs in one frame exceeds ZCL frame limits */
+        for (let n = 0; n < 10; n++) {
+            await ep1.read('ld2450Config', [
                 `zone${n + 1}VertexCount`,
                 `zone${n + 1}Coords`,
                 `zone${n + 1}Cooldown`,
                 `zone${n + 1}Delay`,
-            ]).flat()
-        );
+            ]);
+        }
 
         /* EPs 2-11: occupancy sensing only (zone config lives on EP1) */
         for (let z = 0; z < 10; z++) {
