@@ -111,12 +111,13 @@ static void print_zones(void)
             }
             printf("\n");
         } else {
+            /* Only annotate when NVS has zone data but driver is off — indicates
+             * a sane check failure (vc>=3 with all-zero coords). Clean disables
+             * (NVS vc=0) show as plain "off". */
             if (have_cfg && cfg.zones[i].vertex_count >= 3) {
-                printf("zone%d: off [NVS vc=%u v0=(%d,%d) - sane check failed]\n",
+                printf("zone%d: off [NVS vc=%u v0=(%d,%d) - invalid coords]\n",
                        i + 1, cfg.zones[i].vertex_count,
                        cfg.zones[i].v[0].x_mm, cfg.zones[i].v[0].y_mm);
-            } else if (have_cfg) {
-                printf("zone%d: off [NVS vc=%u]\n", i + 1, cfg.zones[i].vertex_count);
             } else {
                 printf("zone%d: off\n", i + 1);
             }
