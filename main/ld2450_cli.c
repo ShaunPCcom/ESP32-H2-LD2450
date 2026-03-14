@@ -43,8 +43,8 @@ static void print_help(void)
         "  ld en <0|1>\n"
         "  ld mode <single|multi>\n"
         "  ld zones\n"
-        "  ld zone <1-10> <on|off>\n"
-        "  ld zone <1-10> on x1 y1 x2 y2 [x3 y3 ...] (meters, 3-10 vertices)\n"
+        "  ld zone <1-10> off\n"
+        "  ld zone <1-10> vertices x1 y1 x2 y2 [...] (meters, 3-10 pairs)\n"
         "  ld maxdist <mm>               (0-6000)\n"
         "  ld angle <left> <right>       (0-90 degrees)\n"
         "  ld bt <on|off>\n"
@@ -98,10 +98,18 @@ static void print_zones(void)
     }
 
     for (int i = 0; i < 10; i++) {
-        printf("zone%d: %s  vertices=%u\n",
-               i + 1,
-               z[i].vertex_count >= 3 ? "on " : "off",
-               z[i].vertex_count);
+        if (z[i].vertex_count >= 3) {
+            printf("zone%d: on  vertices=%u  coords=", i + 1, z[i].vertex_count);
+            for (uint8_t v = 0; v < z[i].vertex_count; v++) {
+                if (v > 0) printf(",");
+                printf("%.3f,%.3f",
+                       z[i].v[v].x_mm / 1000.0f,
+                       z[i].v[v].y_mm / 1000.0f);
+            }
+            printf("\n");
+        } else {
+            printf("zone%d: off\n", i + 1);
+        }
     }
 }
 
@@ -432,17 +440,19 @@ static void cli_task(void *arg)
 
             if (strcmp(cmd, "zone") == 0) {
                 char *zid = strtok(NULL, " \t\r\n");
-                char *onoff = strtok(NULL, " \t\r\n");
-                if (!zid || !onoff) { printf("usage: ld zone <1-10> <on|off> [coords...]\n"); continue; }
+                if (!zid) { printf("usage: ld zone <1-10> <off|vertices x1 y1 ...>\n"); continue; }
 
                 int zi = atoi(zid) - 1;
                 if (zi < 0 || zi >= 10) { printf("zone id must be 1-10\n"); continue; }
+
+                char *subcmd = strtok(NULL, " \t\r\n");
+                if (!subcmd) { printf("usage: ld zone <1-10> <off|vertices x1 y1 ...>\n"); continue; }
 
                 ld2450_zone_t all[10];
                 if (ld2450_get_zones(all, 10) != ESP_OK) { printf("zones: error\n"); continue; }
                 ld2450_zone_t z = all[zi];
 
-                if (strcmp(onoff, "off") == 0) {
+                if (strcmp(subcmd, "off") == 0) {
                     z.vertex_count = 0;
                     if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {
                         esp_err_t err = nvs_config_save_zone((uint8_t)zi, &z);
@@ -457,8 +467,8 @@ static void cli_task(void *arg)
                     continue;
                 }
 
-                if (strcmp(onoff, "on") != 0) {
-                    printf("usage: ld zone <1-10> <on|off> [coords...]\n");
+                if (strcmp(subcmd, "vertices") != 0) {
+                    printf("usage: ld zone <1-10> <off|vertices x1 y1 ...>\n");
                     continue;
                 }
 
@@ -470,28 +480,8 @@ static void cli_task(void *arg)
                     if (coords[i]) ntok++;
                 }
 
-                /* "on" without coords: re-enable if already has vertices, else fail */
-                if (ntok == 0) {
-                    if (z.vertex_count < 3) {
-                        printf("zone%d has no vertices — provide coords to enable\n", zi + 1);
-                        continue;
-                    }
-                    if (ld2450_set_zone((size_t)zi, &z) == ESP_OK) {
-                        esp_err_t err = nvs_config_save_zone((uint8_t)zi, &z);
-                        if (err == ESP_OK) {
-                            printf("zone%d enabled (saved)\n", zi + 1);
-                        } else {
-                            printf("zone%d enabled BUT NVS SAVE FAILED: %s\n", zi + 1, esp_err_to_name(err));
-                        }
-                    } else {
-                        printf("zone%d update failed\n", zi + 1);
-                    }
-                    continue;
-                }
-
-                /* Must have an even number of tokens (x,y pairs) */
-                if (ntok % 2 != 0) {
-                    printf("coords must be x y pairs\n");
+                if (ntok == 0 || ntok % 2 != 0) {
+                    printf("vertices requires x y pairs (e.g. 0.5 0.5 1.0 0.5 0.75 1.0)\n");
                     continue;
                 }
                 int npairs = ntok / 2;
