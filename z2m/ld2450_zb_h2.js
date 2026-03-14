@@ -214,6 +214,9 @@ const tzLocal = {
                     } catch (e) {
                         meta.logger.warn(`[ZB_LD2450] Coords resize failed: ${e.message}`);
                     }
+                } else {
+                    /* Zone disabled — clear cached coords in Z2M state */
+                    stateUpdate[coordsKey] = '';
                 }
 
                 return {state: stateUpdate};

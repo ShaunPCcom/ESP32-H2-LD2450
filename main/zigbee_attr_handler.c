@@ -136,6 +136,15 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
             uint8_t vc = *(uint8_t *)val;
             if (vc > MAX_ZONE_VERTICES) vc = 0;  /* clamp invalid to disabled */
             cfg.zones[n].vertex_count = vc;
+
+            /* Disabling a zone: zero coords and clear the ZCL coords attribute */
+            if (vc < 3) {
+                memset(cfg.zones[n].v, 0, sizeof(cfg.zones[n].v));
+                uint8_t empty_zcl[1] = { 0 };  /* ZCL string: length=0 */
+                esp_zb_zcl_set_attribute_val(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG,
+                    ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ATTR_ZONE_COORDS(n), empty_zcl, false);
+            }
+
             esp_err_t ze = ld2450_set_zone((size_t)n, &cfg.zones[n]);
             if (ze == ESP_OK) {
                 /* Valid zone (disabled or has real coords): save to NVS */
