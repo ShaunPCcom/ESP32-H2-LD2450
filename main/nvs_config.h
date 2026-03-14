@@ -44,5 +44,11 @@ esp_err_t nvs_config_save_angle_left(uint8_t deg);
 esp_err_t nvs_config_save_angle_right(uint8_t deg);
 esp_err_t nvs_config_save_bt_disabled(uint8_t disabled);
 esp_err_t nvs_config_save_zone(uint8_t zone_index, const ld2450_zone_t *zone);
+
+/** Update the in-memory zone cache without writing to NVS flash.
+ *  Used during the two-phase write protocol: vertex_count arrives before coords.
+ *  Call this when vertex_count >= 3 but coords are not yet present.
+ *  The subsequent coords write will call nvs_config_save_zone to persist. */
+void nvs_config_update_zone_cache(uint8_t zone_index, const ld2450_zone_t *zone);
 esp_err_t nvs_config_save_occupancy_cooldown(uint8_t endpoint_index, uint16_t sec);
 esp_err_t nvs_config_save_occupancy_delay(uint8_t endpoint_index, uint16_t ms);

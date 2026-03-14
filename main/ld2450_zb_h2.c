@@ -26,7 +26,11 @@ static void apply_saved_config(const nvs_config_t *cfg)
      * has vertex_count>=3 with all-zero coords (e.g. Z2M auto-populated placeholder).
      * Per-zone calls let valid zones load while placeholders stay disabled. */
     for (int i = 0; i < 10; i++) {
-        ld2450_set_zone((size_t)i, &cfg->zones[i]);
+        esp_err_t ze = ld2450_set_zone((size_t)i, &cfg->zones[i]);
+        ESP_LOGI(TAG, "zone_%d: vc=%u v0=(%d,%d) -> %s",
+                 i, cfg->zones[i].vertex_count,
+                 cfg->zones[i].v[0].x_mm, cfg->zones[i].v[0].y_mm,
+                 ze == ESP_OK ? "ok" : esp_err_to_name(ze));
     }
 
     /* Allow sensor time to boot before sending commands */

@@ -273,6 +273,12 @@ esp_err_t nvs_config_save_bt_disabled(uint8_t disabled)
     return nvs_save_u8("bt_off", disabled);
 }
 
+void nvs_config_update_zone_cache(uint8_t zone_index, const ld2450_zone_t *zone)
+{
+    if (zone_index >= 10 || !zone) return;
+    s_cfg.zones[zone_index] = *zone;
+}
+
 esp_err_t nvs_config_save_zone(uint8_t zone_index, const ld2450_zone_t *zone)
 {
     if (zone_index >= 10 || !zone) return ESP_ERR_INVALID_ARG;

@@ -97,6 +97,9 @@ static void print_zones(void)
         return;
     }
 
+    nvs_config_t cfg;
+    bool have_cfg = (nvs_config_get(&cfg) == ESP_OK);
+
     for (int i = 0; i < 10; i++) {
         if (z[i].vertex_count >= 3) {
             printf("zone%d: on  vertices=%u  coords=", i + 1, z[i].vertex_count);
@@ -108,7 +111,15 @@ static void print_zones(void)
             }
             printf("\n");
         } else {
-            printf("zone%d: off\n", i + 1);
+            if (have_cfg && cfg.zones[i].vertex_count >= 3) {
+                printf("zone%d: off [NVS vc=%u v0=(%d,%d) - sane check failed]\n",
+                       i + 1, cfg.zones[i].vertex_count,
+                       cfg.zones[i].v[0].x_mm, cfg.zones[i].v[0].y_mm);
+            } else if (have_cfg) {
+                printf("zone%d: off [NVS vc=%u]\n", i + 1, cfg.zones[i].vertex_count);
+            } else {
+                printf("zone%d: off\n", i + 1);
+            }
         }
     }
 }

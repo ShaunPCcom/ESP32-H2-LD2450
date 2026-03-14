@@ -136,10 +136,19 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
             uint8_t vc = *(uint8_t *)val;
             if (vc > MAX_ZONE_VERTICES) vc = 0;  /* clamp invalid to disabled */
             cfg.zones[n].vertex_count = vc;
-            ld2450_set_zone((size_t)n, &cfg.zones[n]);
-            esp_err_t err = nvs_config_save_zone((uint8_t)n, &cfg.zones[n]);
-            ESP_LOGI(TAG, "zone_%d vertex_count -> %u%s", n + 1, vc,
-                     (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            esp_err_t ze = ld2450_set_zone((size_t)n, &cfg.zones[n]);
+            if (ze == ESP_OK) {
+                /* Valid zone (disabled or has real coords): save to NVS */
+                esp_err_t err = nvs_config_save_zone((uint8_t)n, &cfg.zones[n]);
+                ESP_LOGI(TAG, "zone_%d vertex_count -> %u%s", n + 1, vc,
+                         (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            } else {
+                /* vc >= 3 but no coords yet: update in-memory cache only.
+                 * The subsequent coords write will validate pairs==vc and
+                 * save the complete zone to NVS once coords are present. */
+                nvs_config_update_zone_cache((uint8_t)n, &cfg.zones[n]);
+                ESP_LOGI(TAG, "zone_%d vertex_count -> %u (pending coords, cache only)", n + 1, vc);
+            }
 
         } else if (sub == 1) {
             /* coords CSV write — validate pair count before applying */
