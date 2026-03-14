@@ -6,15 +6,15 @@
 
 ESP32-H2 + HLK-LD2450 mmWave presence sensor with native Zigbee support. This firmware is a Zigbee alternative to ESPHome-based implementations, bringing native Zigbee mesh networking to the LD2450 sensor.
 
-The LD2450 is a 24GHz mmWave radar sensor that tracks up to 3 targets simultaneously, reporting their X/Y coordinates in millimeters. This firmware adds **5 configurable quadrilateral zones** for room-level presence detection and integrates everything into Home Assistant via Zigbee2MQTT.
+The LD2450 is a 24GHz mmWave radar sensor that tracks up to 3 targets simultaneously, reporting their X/Y coordinates. This firmware adds **10 configurable polygon zones** (3–10 vertices each — triangles, rectangles, or any irregular shape) for room-level presence detection and integrates everything into Home Assistant via Zigbee2MQTT.
 
 **Based on**: [TillFleisch/ESPHome-HLK-LD2450](https://github.com/TillFleisch/ESPHome-HLK-LD2450) - UART protocol implementation derived from this ESPHome component (MIT License). Reimplemented in C for ESP-IDF with Zigbee support and multi-zone architecture.
 
 ## Features
 
 - **3-target tracking**: Real-time X/Y coordinates (mm) for up to 3 moving targets
-- **5 configurable zones**: Define custom quadrilateral presence detection areas (e.g., "couch", "desk", "bed")
-- **Zigbee2MQTT integration**: 76 Home Assistant entities via external converter
+- **10 configurable zones**: Define custom polygon presence detection areas with 3–10 vertices each (e.g., "couch", "desk", "bed")
+- **Zigbee2MQTT integration**: 71 Home Assistant entities via external converter
 - **OTA firmware updates**: Remote updates via Zigbee2MQTT (dual partition rollback protection)
 - **Crash diagnostic telemetry**: Remote debugging via boot_count, reset_reason, last_uptime, and min_free_heap sensors
 - **NVS persistence**: All configuration survives reboots (independent of coordinator)
@@ -31,14 +31,14 @@ This Zigbee implementation offers different trade-offs compared to ESPHome-based
 - ✅ **Mesh networking** - Router-capable, extends Zigbee network range
 - ✅ **OTA updates** - Remote firmware updates via Zigbee2MQTT with automatic rollback
 - ✅ **NVS persistence** - Config survives without coordinator connection
-- ✅ **Multi-endpoint architecture** - 6 Zigbee endpoints (cleaner HA organization)
+- ✅ **Multi-endpoint architecture** - 11 Zigbee endpoints (cleaner HA organization)
 - ✅ **Two-level factory reset** - Separate Zigbee vs full config reset
 - ✅ **Serial CLI** - Direct UART configuration without network dependency
-- ✅ **5 configurable zones** - More than typical ESPHome examples (which show 1 zone)
+- ✅ **10 configurable zones** - More than typical ESPHome examples (which show 1 zone)
+- ✅ **Flexible polygons** - 3–10 vertices per zone (triangles, rectangles, irregular shapes)
 
 ### **Advantages of ESPHome Version**
-- ✅ **Unlimited zones** - Component supports unlimited zones (vs fixed 5)
-- ✅ **Flexible polygons** - 3+ vertices per zone (vs fixed 4-vertex quadrilaterals)
+- ✅ **Unlimited zones** - Component supports unlimited zones (vs fixed 10)
 - ✅ **Rich per-target data** - Individual speed, distance, angle sensors per target
 - ✅ **Dynamic zone updates** - Runtime polygon updates via actions
 - ✅ **Web interface** - ESPHome web UI for configuration
@@ -122,7 +122,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 4. **Reconfigure** (if entities are missing):
    - In Z2M, select the device
    - Click "Reconfigure" in device settings
-   - Refresh Home Assistant to see all 59 entities
+   - Refresh Home Assistant to see all 71 entities
 
 ## Firmware Updates (OTA)
 
@@ -184,52 +184,46 @@ All entities are automatically discovered in Home Assistant via Zigbee2MQTT:
 
 | Entity | Type | Description |
 |--------|------|-------------|
-| `sensor.ld2450_target_count` | Numeric (0-3) | Number of tracked targets |
-| `sensor.ld2450_target_coords` | String | Target coordinates: "x1,y1;x2,y2;x3,y3" (mm) |
 | `binary_sensor.ld2450_occupancy` | Binary | Overall occupancy (any target present) |
-| `binary_sensor.ld2450_zone_1_occupancy` | Binary | Zone 1 occupancy |
-| `binary_sensor.ld2450_zone_2_occupancy` | Binary | Zone 2 occupancy |
-| `binary_sensor.ld2450_zone_3_occupancy` | Binary | Zone 3 occupancy |
-| `binary_sensor.ld2450_zone_4_occupancy` | Binary | Zone 4 occupancy |
-| `binary_sensor.ld2450_zone_5_occupancy` | Binary | Zone 5 occupancy |
+| `binary_sensor.ld2450_zone_1_occupancy` … `zone_10_occupancy` | Binary ×10 | Per-zone occupancy |
+| `sensor.ld2450_target_count` | Numeric (0–3) | Number of tracked targets |
+| `sensor.ld2450_target_1_x` / `target_1_y` … `target_3_x` / `target_3_y` | Numeric ×6 | Target X/Y coordinates in metres |
 | `sensor.ld2450_boot_count` | Numeric | Total device reboots (monotonic counter) |
-| `sensor.ld2450_reset_reason` | Numeric (0-15) | Last reset cause (1=POWERON, 3=SOFTWARE, 8=BROWNOUT, etc.) |
-| `sensor.ld2450_last_uptime_sec` | Numeric | Uptime in seconds before last reset (0=unknown) |
+| `sensor.ld2450_reset_reason` | Numeric (0–15) | Last reset cause (1=POWERON, 3=SOFTWARE, 8=BROWNOUT, etc.) |
+| `sensor.ld2450_last_uptime_sec` | Numeric | Uptime in seconds before last reset (0 after power loss) |
 | `sensor.ld2450_min_free_heap` | Numeric (bytes) | Minimum free heap memory since boot |
 
 ### Configuration (Read-Write)
 
 | Entity | Type | Range | Description |
 |--------|------|-------|-------------|
-| `number.ld2450_max_distance` | Numeric | 0-6000 mm | Max detection distance |
-| `number.ld2450_angle_left` | Numeric | 0-60° | Left angle limit |
-| `number.ld2450_angle_right` | Numeric | 0-60° | Right angle limit |
-| `select.ld2450_tracking_mode` | Select | Multi/Single | Tracking mode |
+| `number.ld2450_max_distance` | Numeric | 0–6 m | Max detection distance |
+| `number.ld2450_angle_left` | Numeric | 0–90° | Left angle limit |
+| `number.ld2450_angle_right` | Numeric | 0–90° | Right angle limit |
+| `switch.ld2450_tracking_mode` | Switch | ON=Multi/OFF=Single | Multi-target tracking mode |
 | `switch.ld2450_coord_publishing` | Switch | ON/OFF | Enable coordinate publishing |
-| `number.ld2450_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (main sensor) |
-| `number.ld2450_zone_1_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 1) |
-| `number.ld2450_zone_2_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 2) |
-| `number.ld2450_zone_3_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 3) |
-| `number.ld2450_zone_4_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 4) |
-| `number.ld2450_zone_5_occupancy_cooldown` | Numeric | 0-300 sec | Cooldown before reporting Clear (zone 5) |
+| `number.ld2450_occupancy_cooldown` | Numeric | 0–300 s | Cooldown before reporting Clear (main sensor) |
+| `number.ld2450_occupancy_delay` | Numeric | 0–65535 ms | Delay before reporting Occupied (main sensor) |
 
-### Zone Vertices (8 per zone, 40 total)
+### Zone Configuration (4 entities per zone, 40 total)
 
-Each of the 5 zones has 4 polygon vertices (X1, Y1, X2, Y2, X3, Y3, X4, Y4):
+Each of the 10 zones has:
 
-- `number.ld2450_zone_1_x1` through `number.ld2450_zone_1_y4` (8 entities)
-- `number.ld2450_zone_2_x1` through `number.ld2450_zone_2_y4` (8 entities)
-- ...
-- `number.ld2450_zone_5_x1` through `number.ld2450_zone_5_y4` (8 entities)
+| Entity | Type | Description |
+|--------|------|-------------|
+| `select.ld2450_zone_N_vertex_count` | Select | Number of vertices: 0 (disabled) or 3–10 |
+| `text.ld2450_zone_N_coords` | Text | Polygon vertices as flat metres CSV: `x1,y1,x2,y2,...` |
+| `number.ld2450_zone_N_cooldown` | Numeric (0–300 s) | Cooldown before reporting Clear for this zone |
+| `number.ld2450_zone_N_delay` | Numeric (0–65535 ms) | Delay before reporting Occupied for this zone |
 
 ### Actions
 
 | Entity | Type | Description |
 |--------|------|-------------|
-| `button.ld2450_restart` | Button | Restart the device |
+| `select.ld2450_restart` | Select | Set to `restart` to reboot the device |
 | `text.ld2450_factory_reset_confirm` | Text | Type `factory-reset` to trigger a full factory reset |
 
-**Total**: 76 entities (6 occupancy sensors, 11 config controls, 40 zone vertices, 12 read-only attributes, 6 occupancy delays, 1 factory reset)
+**Total**: 71 entities (11 occupancy sensors, 7 config controls, 40 zone config, 8 read-only sensors, 2 diagnostics actions, 3 target coords)
 
 ## Configuration
 
@@ -248,9 +242,12 @@ Connect a serial terminal (115200 baud) to see the CLI prompt:
 # View sensor state
 ld state
 
-# Configure a zone (4-point polygon, coordinates in mm)
-ld zone 1 -3000,-2000 3000,-2000 3000,2000 -3000,2000
-ld zone 1 on
+# List all zones
+ld zones
+
+# Configure a zone (coordinates in metres, 3-10 vertex pairs)
+ld zone 1 vertices -0.5 1.0 0.5 1.0 0.5 3.0 -0.5 3.0
+ld zone 1 off
 
 # Set max distance and angle limits (applied via zone filter)
 ld maxdist 5000
@@ -263,10 +260,9 @@ ld mode multi  # or: ld mode single
 ld coords on
 
 # Set occupancy cooldown (seconds before reporting Clear)
-ld cooldown 10           # Set main sensor cooldown
-ld cooldown zone 1 15    # Set zone 1 cooldown
-ld cooldown zone 2 20    # Set zone 2 cooldown
-ld cooldown all 10       # Set all endpoints to same value
+ld cooldown 10            # Set main sensor cooldown
+ld cooldown zone 1 15    # Set zone 1 cooldown (zones 1-10)
+ld cooldown all 10       # Set all 11 endpoints to same value
 
 # Bluetooth control
 ld bt off
@@ -334,7 +330,7 @@ The **occupancy cooldown** feature prevents false "unoccupied" reports when some
 4. Person leaves room → After 10 seconds, reports "Clear"
 
 **Configuration per endpoint:**
-Each of the 6 endpoints (main + 5 zones) has its own independent cooldown value. This allows fine-tuning behavior per area:
+Each of the 11 endpoints (main + 10 zones) has its own independent cooldown value. This allows fine-tuning behavior per area:
 - **Bedroom main**: 30s (avoid premature clearing)
 - **Bedroom zone (bed)**: 60s (longer for sleeping area)
 - **Hallway**: 5s (want quick clearing for transit areas)
@@ -403,13 +399,12 @@ Erases **both** Zigbee network and NVS configuration (zones, max distance, angle
 
 ### Zigbee Endpoints
 
-- **EP 1**: Main device (overall occupancy + config attributes)
-- **EP 2-6**: Zones 1-5 (per-zone occupancy + vertex attributes)
+- **EP 1**: Main device (overall occupancy + all config attributes)
+- **EP 2–11**: Zones 1–10 (per-zone occupancy only — zone config lives on EP 1)
 
 ### Custom Clusters
 
-- **0xFC00** (EP 1): Target count, coordinates, max distance, angle, tracking mode, coord publishing, restart, factory_reset
-- **0xFC01** (EP 2-6): Zone vertices (8 signed 16-bit attributes: X1, Y1, X2, Y2, X3, Y3, X4, Y4)
+- **0xFC00** (EP 1): Target count, coordinates, max distance, angle, tracking mode, coord publishing, occupancy cooldown/delay, crash diagnostics, restart, factory reset, zone config (vertex count, coords CSV, cooldown, delay for all 10 zones via attribute range 0x0040–0x006B)
 
 ## Acknowledgments
 
