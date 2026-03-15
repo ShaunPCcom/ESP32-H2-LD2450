@@ -30,9 +30,9 @@ Standalone Plotly graph card showing:
 ### `zone-dashboard.yaml`
 
 Complete dashboard tab with:
-- **Zone coordinate inputs** (vertex count selector + CSV text input per zone, shown for zones 1–5)
+- **Zone coordinate inputs** (vertex count selector + CSV text input for all 10 zones)
 - **Plotly graph visualization** (all 10 zones embedded in the dashboard)
-- **Occupancy badges** (quick status for zones 1–5)
+- **Occupancy badges** (quick status for all 10 zones)
 - **Control buttons** (restart device, toggle tracking mode/coordinates)
 
 **Usage:**
@@ -42,7 +42,6 @@ Complete dashboard tab with:
 4. Edit dashboard → Three dots menu → "Raw configuration editor"
 5. Paste the modified YAML content
 6. Customize zone names and headings as needed
-7. Copy and rename zone sections 1–5 for zones 6–10 if needed
 
 ## Configuration Workflow
 

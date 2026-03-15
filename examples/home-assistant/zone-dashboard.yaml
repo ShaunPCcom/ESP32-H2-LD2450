@@ -12,7 +12,6 @@
 #
 # Zone coordinates are in metres as a flat CSV: x1,y1,x2,y2,x3,y3,...
 # Use zone_N_vertex_count to set the number of vertices (0=disabled, 3-10=active).
-# Zones 6-10 follow the same pattern as zones 1-5 shown below.
 #
 type: sections
 max_columns: 4
@@ -73,6 +72,61 @@ sections:
           - entity: select.YOUR_DEVICE_ID_zone_5_vertex_count
             name: Vertex count
           - entity: text.YOUR_DEVICE_ID_zone_5_coords
+            name: Coordinates (m)
+  - type: grid
+    cards:
+      - type: heading
+        heading: Zone 6
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: select.YOUR_DEVICE_ID_zone_6_vertex_count
+            name: Vertex count
+          - entity: text.YOUR_DEVICE_ID_zone_6_coords
+            name: Coordinates (m)
+  - type: grid
+    cards:
+      - type: heading
+        heading: Zone 7
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: select.YOUR_DEVICE_ID_zone_7_vertex_count
+            name: Vertex count
+          - entity: text.YOUR_DEVICE_ID_zone_7_coords
+            name: Coordinates (m)
+  - type: grid
+    cards:
+      - type: heading
+        heading: Zone 8
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: select.YOUR_DEVICE_ID_zone_8_vertex_count
+            name: Vertex count
+          - entity: text.YOUR_DEVICE_ID_zone_8_coords
+            name: Coordinates (m)
+  - type: grid
+    cards:
+      - type: heading
+        heading: Zone 9
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: select.YOUR_DEVICE_ID_zone_9_vertex_count
+            name: Vertex count
+          - entity: text.YOUR_DEVICE_ID_zone_9_coords
+            name: Coordinates (m)
+  - type: grid
+    cards:
+      - type: heading
+        heading: Zone 10
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: select.YOUR_DEVICE_ID_zone_10_vertex_count
+            name: Vertex count
+          - entity: text.YOUR_DEVICE_ID_zone_10_coords
             name: Coordinates (m)
   - type: grid
     cards:
@@ -345,6 +399,51 @@ badges:
     tap_action:
       action: none
     name: Zone 5
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_6_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: Zone 6
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_7_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: Zone 7
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_8_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: Zone 8
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_9_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: Zone 9
+  - type: entity
+    show_name: true
+    show_state: true
+    show_icon: true
+    entity: binary_sensor.YOUR_DEVICE_ID_zone_10_occupancy
+    state_content: state
+    tap_action:
+      action: none
+    name: Zone 10
   - type: entity
     show_name: true
     show_state: true
