@@ -75,6 +75,8 @@ static const nvs_config_t DEFAULT_CONFIG = {
     },
     .occupancy_cooldown_sec = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},   /* 11 entries: main + 10 zones */
     .occupancy_delay_ms     = {250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250},
+    .fallback_mode          = 0,
+    .fallback_cooldown_sec  = {300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300},
 };
 
 static esp_err_t nvs_save_u8(const char *key, uint8_t val)
@@ -216,6 +218,21 @@ esp_err_t nvs_config_init(void)
         }
     }
 
+    /* Load fallback_mode */
+    nvs_get_u8(h, "fb_mode", &s_cfg.fallback_mode);
+
+    /* Load fallback cooldowns — versioned blob: { version(1), reserved(1), cooldowns[11] } */
+    {
+        typedef struct { uint8_t version; uint8_t reserved; uint16_t cooldowns[11]; } fb_cool_blob_t;
+        fb_cool_blob_t blob = {0};
+        size_t blen = sizeof(blob);
+        if (nvs_get_blob(h, "fb_cool", &blob, &blen) == ESP_OK
+                && blen == sizeof(blob) && blob.version == 1) {
+            memcpy(s_cfg.fallback_cooldown_sec, blob.cooldowns, sizeof(s_cfg.fallback_cooldown_sec));
+        }
+        /* else: keep defaults (300s each) */
+    }
+
     nvs_close(h);
 
     ESP_LOGI(TAG, "Config loaded: dist=%u left=%u right=%u bt_off=%u mode=%u coords=%u",
@@ -301,4 +318,23 @@ esp_err_t nvs_config_save_occupancy_delay(uint8_t endpoint_index, uint16_t ms)
     if (endpoint_index >= 11) return ESP_ERR_INVALID_ARG;
     s_cfg.occupancy_delay_ms[endpoint_index] = ms;
     return nvs_save_blob("occ_delay", s_cfg.occupancy_delay_ms, sizeof(s_cfg.occupancy_delay_ms));
+}
+
+esp_err_t nvs_config_save_fallback_mode(uint8_t mode)
+{
+    s_cfg.fallback_mode = mode;
+    return nvs_save_u8("fb_mode", mode);
+}
+
+esp_err_t nvs_config_save_fallback_cooldown(uint8_t endpoint_index, uint16_t sec)
+{
+    if (endpoint_index >= 11) return ESP_ERR_INVALID_ARG;
+    if (sec > 600) sec = 600;
+    s_cfg.fallback_cooldown_sec[endpoint_index] = sec;
+
+    /* Versioned blob: { version=1, reserved=0, cooldowns[11] } */
+    typedef struct { uint8_t version; uint8_t reserved; uint16_t cooldowns[11]; } fb_cool_blob_t;
+    fb_cool_blob_t blob = { .version = 1, .reserved = 0 };
+    memcpy(blob.cooldowns, s_cfg.fallback_cooldown_sec, sizeof(s_cfg.fallback_cooldown_sec));
+    return nvs_save_blob("fb_cool", &blob, sizeof(blob));
 }

@@ -13,6 +13,7 @@
 #include "esp_zigbee_core.h"
 
 /* Project */
+#include "coordinator_fallback.h"
 #include "ld2450.h"
 #include "nvs_config.h"
 #include "sensor_bridge.h"
@@ -120,7 +121,12 @@ static void sensor_poll_cb(uint8_t param)
 
     /* EP 1: Overall occupancy */
     bool occupied = state.occupied_global;
-    uint32_t main_cooldown_ticks = pdMS_TO_TICKS(cfg.occupancy_cooldown_sec[0] * 1000);
+    /* Use fallback cooldown if global fallback is active OR this EP is mid-session */
+    uint32_t main_cooldown_sec = (coordinator_fallback_is_active()
+                                  || coordinator_fallback_ep_session_active(0))
+        ? cfg.fallback_cooldown_sec[0]
+        : cfg.occupancy_cooldown_sec[0];
+    uint32_t main_cooldown_ticks = pdMS_TO_TICKS(main_cooldown_sec * 1000);
     int64_t main_delay_us = cfg.occupancy_delay_ms[0] * 1000LL;
 
     bool raw_was_occupied = s_raw_occupied;
@@ -157,6 +163,7 @@ static void sensor_poll_cb(uint8_t param)
             s_last_report_time[0] = current_ticks;
             s_pending_occupied[0] = false;
             any_sensor_change = true;
+            coordinator_fallback_on_occupancy_change(ZB_EP_MAIN, true);
         }
     }
 
@@ -174,13 +181,19 @@ static void sensor_poll_cb(uint8_t param)
             s_last_report_time[0] = current_ticks;
             s_pending_clear[0] = false;
             any_sensor_change = true;
+            coordinator_fallback_on_occupancy_change(ZB_EP_MAIN, false);
         }
     }
 
     /* EPs 2-11: Per-zone occupancy */
     for (int i = 0; i < 10; i++) {
         bool zone_occ = state.zone_occupied[i];
-        uint32_t zone_cooldown_ticks = pdMS_TO_TICKS(cfg.occupancy_cooldown_sec[i + 1] * 1000);
+        /* Use fallback cooldown if global fallback is active OR this zone is mid-session */
+        uint32_t zone_cooldown_sec = (coordinator_fallback_is_active()
+                                      || coordinator_fallback_ep_session_active((uint8_t)(i + 1)))
+            ? cfg.fallback_cooldown_sec[i + 1]
+            : cfg.occupancy_cooldown_sec[i + 1];
+        uint32_t zone_cooldown_ticks = pdMS_TO_TICKS(zone_cooldown_sec * 1000);
         int64_t zone_delay_us = cfg.occupancy_delay_ms[i + 1] * 1000LL;
 
         bool raw_was = s_raw_zone_occ[i];
@@ -217,6 +230,7 @@ static void sensor_poll_cb(uint8_t param)
                 s_last_report_time[i + 1] = current_ticks;
                 s_pending_occupied[i + 1] = false;
                 any_sensor_change = true;
+                coordinator_fallback_on_occupancy_change(ZB_EP_ZONE(i), true);
             }
         }
 
@@ -234,6 +248,7 @@ static void sensor_poll_cb(uint8_t param)
                 s_last_report_time[i + 1] = current_ticks;
                 s_pending_clear[i + 1] = false;
                 any_sensor_change = true;
+                coordinator_fallback_on_occupancy_change(ZB_EP_ZONE(i), false);
             }
         }
     }

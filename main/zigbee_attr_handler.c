@@ -6,6 +6,7 @@
 #include "esp_zigbee_core.h"
 
 /* Project */
+#include "coordinator_fallback.h"
 #include "ld2450.h"
 #include "ld2450_cmd.h"
 #include "ld2450_zone_csv.h"
@@ -107,6 +108,23 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
             ESP_LOGI(TAG, "Main occupancy delay -> %u ms%s", ms, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
             return ESP_OK;
         }
+        case ZB_ATTR_FALLBACK_MODE: {
+            uint8_t mode = *(uint8_t *)val;
+            if (mode == 0) {
+                coordinator_fallback_clear();
+            } else {
+                coordinator_fallback_set();
+            }
+            esp_err_t err = nvs_config_save_fallback_mode(mode);
+            ESP_LOGI(TAG, "Fallback mode -> %u%s", mode, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            return ESP_OK;
+        }
+        case ZB_ATTR_FALLBACK_COOLDOWN: {
+            uint16_t sec = *(uint16_t *)val;
+            esp_err_t err = nvs_config_save_fallback_cooldown(0, sec);
+            ESP_LOGI(TAG, "Fallback cooldown (main) -> %u sec%s", sec, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            return ESP_OK;
+        }
         case ZB_ATTR_RESTART:
             zgb_ctrl_handle_restart();
             return ESP_OK;
@@ -119,6 +137,18 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
         default:
             break;
         }
+    }
+
+    /* EP1 fallback zone cooldown attributes (0x0070-0x0079) on cluster 0xFC00 */
+    if (ep == ZB_EP_MAIN && cluster == ZB_CLUSTER_LD2450_CONFIG
+            && attr_id >= ZB_ATTR_FALLBACK_ZONE_COOL_BASE
+            && attr_id <= ZB_ATTR_FALLBACK_ZONE_COOL_BASE + 9) {
+        uint8_t zone_idx = (uint8_t)(attr_id - ZB_ATTR_FALLBACK_ZONE_COOL_BASE);  /* 0-9 → NVS index 1-10 */
+        uint16_t sec = *(uint16_t *)val;
+        esp_err_t err = nvs_config_save_fallback_cooldown((uint8_t)(zone_idx + 1), sec);
+        ESP_LOGI(TAG, "Fallback cooldown zone_%u -> %u sec%s", zone_idx + 1, sec,
+                 (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+        return ESP_OK;
     }
 
     /* EP1 zone config attributes (0x0040-0x006B) on cluster 0xFC00 */

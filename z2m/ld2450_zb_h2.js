@@ -31,26 +31,35 @@ for (let n = 0; n < 10; n++) {
     zoneConfigAttrs[`zone${n + 1}Delay`]       = {ID: base + 3, type: ZCL_UINT16,   write: true};
 }
 
+// ---- Fallback cooldown attribute layout ----
+const fallbackCooldownAttrs = {};
+for (let n = 0; n < 10; n++) {
+    fallbackCooldownAttrs[`fallbackZone${n + 1}Cooldown`] = {ID: 0x0070 + n, type: ZCL_UINT16, write: true};
+}
+
 // ---- Custom cluster definition ----
 const ld2450ConfigCluster = {
     ID: CLUSTER_CONFIG_ID,
     attributes: {
-        targetCount:       {ID: 0x0000, type: ZCL_UINT8,    report: true},
-        targetCoords:      {ID: 0x0001, type: ZCL_CHAR_STR, report: true},
-        maxDistance:       {ID: 0x0010, type: ZCL_UINT16,   write: true},
-        angleLeft:         {ID: 0x0011, type: ZCL_UINT8,    write: true},
-        angleRight:        {ID: 0x0012, type: ZCL_UINT8,    write: true},
-        trackingMode:      {ID: 0x0020, type: ZCL_UINT8,    write: true},
-        coordPublishing:   {ID: 0x0021, type: ZCL_UINT8,    write: true},
-        occupancyCooldown: {ID: 0x0022, type: ZCL_UINT16,   write: true},
-        occupancyDelay:    {ID: 0x0023, type: ZCL_UINT16,   write: true},
-        bootCount:         {ID: 0x0030, type: ZCL_UINT32,   report: false},
-        resetReason:       {ID: 0x0031, type: ZCL_UINT8,    report: false},
-        lastUptimeSec:     {ID: 0x0032, type: ZCL_UINT32,   report: false},
-        minFreeHeap:       {ID: 0x0033, type: ZCL_UINT32,   report: false},
-        restart:           {ID: 0x00F0, type: ZCL_UINT8,    write: true},
-        factoryReset:      {ID: 0x00F1, type: ZCL_UINT8,    write: true},
+        targetCount:          {ID: 0x0000, type: ZCL_UINT8,    report: true},
+        targetCoords:         {ID: 0x0001, type: ZCL_CHAR_STR, report: true},
+        maxDistance:          {ID: 0x0010, type: ZCL_UINT16,   write: true},
+        angleLeft:            {ID: 0x0011, type: ZCL_UINT8,    write: true},
+        angleRight:           {ID: 0x0012, type: ZCL_UINT8,    write: true},
+        trackingMode:         {ID: 0x0020, type: ZCL_UINT8,    write: true},
+        coordPublishing:      {ID: 0x0021, type: ZCL_UINT8,    write: true},
+        occupancyCooldown:    {ID: 0x0022, type: ZCL_UINT16,   write: true},
+        occupancyDelay:       {ID: 0x0023, type: ZCL_UINT16,   write: true},
+        fallbackMode:         {ID: 0x0024, type: ZCL_UINT8,    write: true, report: true},
+        fallbackCooldown:     {ID: 0x0025, type: ZCL_UINT16,   write: true},
+        bootCount:            {ID: 0x0030, type: ZCL_UINT32,   report: false},
+        resetReason:          {ID: 0x0031, type: ZCL_UINT8,    report: false},
+        lastUptimeSec:        {ID: 0x0032, type: ZCL_UINT32,   report: false},
+        minFreeHeap:          {ID: 0x0033, type: ZCL_UINT32,   report: false},
+        restart:              {ID: 0x00F0, type: ZCL_UINT8,    write: true},
+        factoryReset:         {ID: 0x00F1, type: ZCL_UINT8,    write: true},
         ...zoneConfigAttrs,
+        ...fallbackCooldownAttrs,
     },
     commands: {},
     commandsResponse: {},
@@ -126,8 +135,10 @@ const fzLocal = {
             if (d.angleRight !== undefined)      result.angle_right        = d.angleRight;
             if (d.trackingMode !== undefined)    result.tracking_mode      = d.trackingMode === 0;
             if (d.coordPublishing !== undefined) result.coord_publishing   = d.coordPublishing === 1;
-            if (d.occupancyCooldown !== undefined) result.occupancy_cooldown = d.occupancyCooldown;
-            if (d.occupancyDelay !== undefined)  result.occupancy_delay    = d.occupancyDelay;
+            if (d.occupancyCooldown !== undefined)  result.occupancy_cooldown  = d.occupancyCooldown;
+            if (d.occupancyDelay !== undefined)     result.occupancy_delay     = d.occupancyDelay;
+            if (d.fallbackMode !== undefined)       result.fallback_mode       = d.fallbackMode === 1;
+            if (d.fallbackCooldown !== undefined)   result.fallback_cooldown   = d.fallbackCooldown;
 
             if (d.bootCount !== undefined)       result.boot_count         = d.bootCount;
             if (d.resetReason !== undefined)     result.reset_reason       = d.resetReason;
@@ -156,11 +167,13 @@ const fzLocal = {
                 const cs = d[`zone${z}Coords`];
                 const cl = d[`zone${z}Cooldown`];
                 const dl = d[`zone${z}Delay`];
+                const fc = d[`fallbackZone${z}Cooldown`];
 
-                if (vc !== undefined) result[`zone_${z}_vertex_count`] = String(vc);
-                if (cs !== undefined) result[`zone_${z}_coords`]       = mmCsvToMetres(cs || '');
-                if (cl !== undefined) result[`zone_${z}_cooldown`]     = cl;
-                if (dl !== undefined) result[`zone_${z}_delay`]        = dl;
+                if (vc !== undefined) result[`zone_${z}_vertex_count`]      = String(vc);
+                if (cs !== undefined) result[`zone_${z}_coords`]            = mmCsvToMetres(cs || '');
+                if (cl !== undefined) result[`zone_${z}_cooldown`]          = cl;
+                if (dl !== undefined) result[`zone_${z}_delay`]             = dl;
+                if (fc !== undefined) result[`fallback_cooldown_zone_${z}`] = fc;
             }
 
             return result;
@@ -175,6 +188,8 @@ const tzLocal = {
         key: [
             'max_distance', 'angle_left', 'angle_right', 'tracking_mode', 'coord_publishing',
             'occupancy_cooldown', 'occupancy_delay',
+            'fallback_mode', 'fallback_cooldown',
+            ...Array.from({length: 10}, (_, i) => `fallback_cooldown_zone_${i + 1}`),
             ...Array.from({length: 10}, (_, i) => [
                 `zone_${i + 1}_vertex_count`,
                 `zone_${i + 1}_coords`,
@@ -247,6 +262,14 @@ const tzLocal = {
                 return {state: {[key]: value}};
             }
 
+            /* Fallback zone cooldown (fallback_cooldown_zone_N → 0x0070+N) */
+            const fbZoneCoolMatch = key.match(/^fallback_cooldown_zone_(\d+)$/);
+            if (fbZoneCoolMatch) {
+                const n = parseInt(fbZoneCoolMatch[1]) - 1;  /* 0-indexed */
+                await ep1.write('ld2450Config', {[`fallbackZone${n + 1}Cooldown`]: value});
+                return {state: {[key]: value}};
+            }
+
             /* Main endpoint config */
             const map = {
                 max_distance:       {attr: 'maxDistance',       val: (v) => Math.round(v * 1000)},
@@ -256,6 +279,8 @@ const tzLocal = {
                 coord_publishing:   {attr: 'coordPublishing',   val: (v) => v ? 1 : 0},
                 occupancy_cooldown: {attr: 'occupancyCooldown', val: (v) => v},
                 occupancy_delay:    {attr: 'occupancyDelay',    val: (v) => v},
+                fallback_mode:      {attr: 'fallbackMode',      val: (v) => v ? 1 : 0},
+                fallback_cooldown:  {attr: 'fallbackCooldown',  val: (v) => v},
             };
             const m = map[key];
             if (m) {
@@ -282,12 +307,21 @@ const tzLocal = {
                 return;
             }
 
+            /* Fallback zone cooldown get */
+            const fbZoneCoolGetMatch = key.match(/^fallback_cooldown_zone_(\d+)$/);
+            if (fbZoneCoolGetMatch) {
+                const n = parseInt(fbZoneCoolGetMatch[1]) - 1;
+                await ep1.read('ld2450Config', [`fallbackZone${n + 1}Cooldown`]);
+                return;
+            }
+
             /* Main endpoint config */
             const attrs = {
                 max_distance: 'maxDistance', angle_left: 'angleLeft',
                 angle_right: 'angleRight', tracking_mode: 'trackingMode',
                 coord_publishing: 'coordPublishing', occupancy_cooldown: 'occupancyCooldown',
                 occupancy_delay: 'occupancyDelay',
+                fallback_mode: 'fallbackMode', fallback_cooldown: 'fallbackCooldown',
             };
             if (attrs[key]) await ep1.read('ld2450Config', [attrs[key]]);
         },
@@ -375,6 +409,21 @@ const exposesDefinition = [
             {unit: 'ms', value_min: 0, value_max: 65535, value_step: 1}),
     ]).flat(),
 
+    /* Coordinator fallback */
+    binaryExpose('fallback_mode', 'Fallback mode', ACCESS_ALL, true, false,
+        'Active when coordinator is offline and device is controlling lights directly via binding. ' +
+        'Firmware sets this on ACK timeout; HA clears it (write false) to resume normal operation.'),
+
+    numericExpose('fallback_cooldown', 'Fallback cooldown (main)', ACCESS_ALL,
+        'How long to keep main EP light on after Clear in fallback mode',
+        {unit: 's', value_min: 0, value_max: 600, value_step: 1}),
+
+    ...Array.from({length: 10}, (_, i) =>
+        numericExpose(`fallback_cooldown_zone_${i + 1}`, `Fallback cooldown zone ${i + 1}`, ACCESS_ALL,
+            `How long to keep zone ${i + 1} light on after Clear in fallback mode`,
+            {unit: 's', value_min: 0, value_max: 600, value_step: 1})
+    ),
+
     /* Crash diagnostics (read-only) */
     numericExpose('boot_count', 'Boot count', ACCESS_STATE,
         'Total number of device reboots (monotonic counter)', {}),
@@ -401,8 +450,10 @@ const exposesDefinition = [
 // ---- Device definition ----
 
 const definition = {
-    zigbeeModel: ['LD2450-H2'],
-    model: 'LD2450-ZB-H2',
+    /* DEV identifier: matches dev/coordinator-fallback branch firmware.
+     * Revert to 'LD2450-H2' and 'LD2450-ZB-H2' before merging to master. */
+    zigbeeModel: ['LD2450-H2-DEV'],
+    model: 'LD2450-ZB-H2-DEV',
     vendor: 'LD2450Z',
     description: 'HLK-LD2450 mmWave presence sensor (Zigbee, ESP32-H2)',
     fromZigbee: [fzLocal.occupancy, fzLocal.config],
@@ -438,12 +489,16 @@ const definition = {
              maximumReportInterval: 300, reportableChange: 1},
             {attribute: 'targetCoords', minimumReportInterval: 0,
              maximumReportInterval: 300},
+            /* fallback_mode: report on any change (delta=0) so HA sees transitions promptly */
+            {attribute: 'fallbackMode', minimumReportInterval: 0,
+             maximumReportInterval: 3600, reportableChange: 0},
         ]);
 
         /* Read all EP1 config + zone config attrs */
         await ep1.read('ld2450Config', [
             'targetCount', 'targetCoords', 'maxDistance', 'angleLeft', 'angleRight',
             'trackingMode', 'coordPublishing', 'occupancyCooldown', 'occupancyDelay',
+            'fallbackMode', 'fallbackCooldown',
             'bootCount', 'resetReason', 'lastUptimeSec', 'minFreeHeap',
         ]);
         /* Read zone config attrs one zone at a time — 40 attrs in one frame exceeds ZCL frame limits */

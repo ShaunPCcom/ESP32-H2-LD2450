@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "main.cpp"
+        "coordinator_fallback.c"
         "ld2450_cli.c"
         "nvs_config.c"
         "zigbee_init.c"

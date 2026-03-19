@@ -14,6 +14,7 @@
 /* Project */
 #include "board_config.h"
 #include "board_led.h"
+#include "coordinator_fallback.h"
 #include "crash_diag.h"
 #include "ld2450_zone_csv.h"
 #include "nvs_config.h"
@@ -64,6 +65,7 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     /* Load current config for initial values */
     nvs_config_t cfg;
     nvs_config_get(&cfg);
+    uint8_t init_fallback_mode = cfg.fallback_mode;
 
     uint8_t zero_u8 = 0;
     uint16_t init_dist = cfg.max_distance_mm;
@@ -204,12 +206,47 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
             &s_zone_delay[n]);
     }
 
+    /* Fallback mode attribute (0x0024) — RW + reportable so coordinator sees transitions */
+    esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_FALLBACK_MODE,
+        ESP_ZB_ZCL_ATTR_TYPE_U8,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
+        &init_fallback_mode);
+
+    /* Fallback cooldown attributes (0x0025 = main, 0x0070-0x0079 = zones) */
+    static uint16_t s_fb_cool_main = 300;
+    static uint16_t s_fb_cool_zone[10] = {300, 300, 300, 300, 300, 300, 300, 300, 300, 300};
+    {
+        nvs_config_t fb_cfg;
+        nvs_config_get(&fb_cfg);
+        s_fb_cool_main = fb_cfg.fallback_cooldown_sec[0];
+        for (int n = 0; n < 10; n++) {
+            s_fb_cool_zone[n] = fb_cfg.fallback_cooldown_sec[n + 1];
+        }
+    }
+    esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_FALLBACK_COOLDOWN,
+        ESP_ZB_ZCL_ATTR_TYPE_U16,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        &s_fb_cool_main);
+    for (int n = 0; n < 10; n++) {
+        esp_zb_custom_cluster_add_custom_attr(custom,
+            ZB_ATTR_FALLBACK_ZONE_COOL_BASE + n,
+            ESP_ZB_ZCL_ATTR_TYPE_U16,
+            ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+            &s_fb_cool_zone[n]);
+    }
+
     /* Assemble cluster list */
     esp_zb_cluster_list_t *cl = esp_zb_zcl_cluster_list_create();
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_basic_cluster(cl, basic, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cl, identify, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cl, occ, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cl, custom, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+
+    /* On/Off CLIENT cluster — enables binding-based dispatch for fallback mode.
+     * Client On/Off (0x0006) and server Occupancy Sensing (0x0406) are different
+     * cluster IDs on the same endpoint, which is valid ZCL. */
+    esp_zb_attribute_list_t *on_off_client = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_ON_OFF);
+    ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cl, on_off_client, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
 
     /* Add OTA cluster */
     zigbee_ota_config_t ota_cfg = ZIGBEE_OTA_CONFIG_DEFAULT();
@@ -259,6 +296,10 @@ static esp_zb_cluster_list_t *create_zone_ep_clusters(void)
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_basic_cluster(cl, basic, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cl, identify, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cl, occ, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+
+    /* On/Off CLIENT cluster on each zone EP — allows binding zone EP → light for fallback */
+    esp_zb_attribute_list_t *on_off_client = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_ON_OFF);
+    ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cl, on_off_client, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
 
     return cl;
 }
@@ -330,6 +371,9 @@ static void zigbee_task(void *pv)
     esp_zb_core_action_handler_register(zigbee_action_handler);
 
     zigbee_register_endpoints();
+
+    /* Init fallback module after endpoints are registered (needs ZCL attrs to be present) */
+    coordinator_fallback_init();
 
     /* Start Zigbee stack with graceful error handling - avoid reboot on network failure */
     esp_err_t err = esp_zb_start(false);

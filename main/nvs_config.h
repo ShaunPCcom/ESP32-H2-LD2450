@@ -28,6 +28,10 @@ typedef struct {
     /* Occupancy reporting */
     uint16_t occupancy_cooldown_sec[11]; /* 0-300 seconds per endpoint: [0]=main, [1-10]=zones */
     uint16_t occupancy_delay_ms[11];     /* 0-65535 milliseconds per endpoint: [0]=main, [1-10]=zones */
+
+    /* Coordinator fallback */
+    uint8_t  fallback_mode;               /* 0=normal, 1=fallback active (sticky, NVS-backed) */
+    uint16_t fallback_cooldown_sec[11];   /* [0]=main EP, [1-10]=zones; default 300s each */
 } nvs_config_t;
 
 /** Initialize NVS config module and load saved config (or defaults). */
@@ -52,3 +56,9 @@ esp_err_t nvs_config_save_zone(uint8_t zone_index, const ld2450_zone_t *zone);
 void nvs_config_update_zone_cache(uint8_t zone_index, const ld2450_zone_t *zone);
 esp_err_t nvs_config_save_occupancy_cooldown(uint8_t endpoint_index, uint16_t sec);
 esp_err_t nvs_config_save_occupancy_delay(uint8_t endpoint_index, uint16_t ms);
+
+/** Save fallback_mode (0=normal, 1=active) to NVS. */
+esp_err_t nvs_config_save_fallback_mode(uint8_t mode);
+
+/** Save one fallback cooldown entry.  endpoint_index: 0=main, 1-10=zones. */
+esp_err_t nvs_config_save_fallback_cooldown(uint8_t endpoint_index, uint16_t sec);

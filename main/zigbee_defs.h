@@ -50,9 +50,19 @@
 /* 10 vertices × 2 coords × max 6 chars + 9 commas per pair group + separating commas ≈ 153 chars */
 #define ZB_ZONE_COORDS_MAX_LEN         160
 
+/* ---- Fallback mode attributes on EP1 cluster 0xFC00 ---- */
+#define ZB_ATTR_FALLBACK_MODE              0x0024  /* U8,  RW+Report  0=normal, 1=fallback active */
+#define ZB_ATTR_FALLBACK_COOLDOWN          0x0025  /* U16, RW         main EP fallback cooldown (seconds, default: 300) */
+#define ZB_ATTR_FALLBACK_ZONE_COOL_BASE    0x0070  /* U16, RW         zone N cooldown: base + zone_index (0-9) → 0x0070-0x0079 */
+
+/* ACK timeout for coordinator-path occupancy reports */
+#define ACK_TIMEOUT_MS                     2000    /* ms to wait for coordinator ACK before fallback */
+
 /* ---- Identity strings ---- */
 #define ZB_MANUFACTURER_NAME           "\x07""LD2450Z"   /* ZCL string: len byte + chars */
-#define ZB_MODEL_IDENTIFIER            "\x09""LD2450-H2"
+/* DEV identifier: distinguishes dev/coordinator-fallback branch from production in Z2M.
+ * IMPORTANT: revert to "\x09""LD2450-H2" before merging to master. */
+#define ZB_MODEL_IDENTIFIER            "\x0d""LD2450-H2-DEV"
 
 /* ---- Shared zigbee_ctrl attributes ---- */
 #include "zigbee_ctrl.h"

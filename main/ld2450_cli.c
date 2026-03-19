@@ -19,6 +19,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 
+#include "coordinator_fallback.h"
 #include "crash_diag.h"
 #include "ld2450.h"
 #include "ld2450_cmd.h"
@@ -55,6 +56,13 @@ static void print_help(void)
         "  ld delay [milliseconds]       (set main, show all if no value)\n"
         "  ld delay zone <1-10> <ms>     (set zone delay)\n"
         "  ld delay all <milliseconds>  (set all endpoints)\n"
+        "  ld fallback                  (show fallback state)\n"
+        "  ld fallback on               (force enter fallback mode)\n"
+        "  ld fallback off              (clear fallback mode)\n"
+        "  ld fallback cooldown         (show all 11 fallback cooldowns)\n"
+        "  ld fallback cooldown <sec>   (set main fallback cooldown)\n"
+        "  ld fallback cooldown zone <1-10> <sec>\n"
+        "  ld fallback cooldown all <sec>\n"
         "  ld config\n"
         "  ld diag                      (show crash diagnostics)\n"
         "  ld nvs                       (test NVS health)\n"
@@ -402,6 +410,88 @@ static void cli_task(void *arg)
                     }
                     continue;
                 }
+            }
+
+            if (strcmp(cmd, "fallback") == 0) {
+                char *sub = strtok(NULL, " \t\r\n");
+                if (!sub) {
+                    /* Show current state */
+                    bool active = coordinator_fallback_is_active();
+                    printf("fallback: %s\n", active ? "ACTIVE" : "normal");
+                    continue;
+                }
+
+                if (strcmp(sub, "on") == 0) {
+                    coordinator_fallback_set();
+                    nvs_config_save_fallback_mode(1);
+                    printf("fallback: entered (saved)\n");
+                    continue;
+                }
+
+                if (strcmp(sub, "off") == 0) {
+                    coordinator_fallback_clear();
+                    printf("fallback: cleared (saved)\n");
+                    continue;
+                }
+
+                if (strcmp(sub, "cooldown") == 0) {
+                    char *arg1 = strtok(NULL, " \t\r\n");
+                    if (!arg1) {
+                        /* Display all 11 fallback cooldown values */
+                        nvs_config_t cfg;
+                        if (nvs_config_get(&cfg) == ESP_OK) {
+                            printf("fallback cooldown: main=%u z1=%u z2=%u z3=%u z4=%u z5=%u z6=%u z7=%u z8=%u z9=%u z10=%u sec\n",
+                                   cfg.fallback_cooldown_sec[0],  cfg.fallback_cooldown_sec[1],
+                                   cfg.fallback_cooldown_sec[2],  cfg.fallback_cooldown_sec[3],
+                                   cfg.fallback_cooldown_sec[4],  cfg.fallback_cooldown_sec[5],
+                                   cfg.fallback_cooldown_sec[6],  cfg.fallback_cooldown_sec[7],
+                                   cfg.fallback_cooldown_sec[8],  cfg.fallback_cooldown_sec[9],
+                                   cfg.fallback_cooldown_sec[10]);
+                        } else {
+                            printf("fallback cooldown: error reading config\n");
+                        }
+                        continue;
+                    }
+
+                    if (strcmp(arg1, "zone") == 0) {
+                        char *zone_str = strtok(NULL, " \t\r\n");
+                        char *val_str  = strtok(NULL, " \t\r\n");
+                        if (!zone_str || !val_str) {
+                            printf("usage: ld fallback cooldown zone <1-10> <seconds>\n");
+                            continue;
+                        }
+                        int zone = atoi(zone_str);
+                        if (zone < 1 || zone > 10) { printf("zone must be 1-10\n"); continue; }
+                        uint16_t sec = (uint16_t)atoi(val_str);
+                        esp_err_t err = nvs_config_save_fallback_cooldown((uint8_t)zone, sec);
+                        printf("fallback cooldown zone%d=%u sec%s\n", zone, sec,
+                               (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+                        continue;
+                    }
+
+                    if (strcmp(arg1, "all") == 0) {
+                        char *val_str = strtok(NULL, " \t\r\n");
+                        if (!val_str) { printf("usage: ld fallback cooldown all <seconds>\n"); continue; }
+                        uint16_t sec = (uint16_t)atoi(val_str);
+                        bool all_ok = true;
+                        for (uint8_t i = 0; i < 11; i++) {
+                            esp_err_t err = nvs_config_save_fallback_cooldown(i, sec);
+                            if (err != ESP_OK) { printf("ep%u save FAILED\n", i); all_ok = false; }
+                        }
+                        if (all_ok) printf("all fallback cooldowns=%u sec (saved)\n", sec);
+                        continue;
+                    }
+
+                    /* Single value: set main */
+                    uint16_t sec = (uint16_t)atoi(arg1);
+                    esp_err_t err = nvs_config_save_fallback_cooldown(0, sec);
+                    printf("fallback cooldown main=%u sec%s\n", sec,
+                           (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+                    continue;
+                }
+
+                printf("usage: ld fallback [on|off|cooldown ...]\n");
+                continue;
             }
 
             if (strcmp(cmd, "maxdist") == 0) {
