@@ -156,19 +156,10 @@ write `false` manually via Z2M or the CLI (`ld fallback clear`).
 
 ## Limitations
 
-**Bindings are direct On/Off only.** In hard fallback, the sensor dispatches
-On/Off to its bound lights. It cannot replicate complex HA automation logic
-(e.g. "turn on bathroom light when kitchen sensor detects presence"). Bindings
-should target the light physically closest to the sensor's coverage area.
-
-**Cross-room automations are HA's responsibility.** The fallback system is
-designed for same-zone direct control. Complex multi-room logic should be
-handled by HA automations using the `soft_fault` attribute as a trigger hint.
-
-**Per-EP binding mask not implemented.** If a zone has no binding target
-(e.g. a doorway zone with no associated light), it will still dispatch On/Off
-in fallback — it simply won't reach any device. This is harmless but wastes
-a Zigbee transmission.
+**Bindings are direct On/Off only.** Fallback cannot replicate HA automation
+logic beyond a simple on/off switch — brightness levels, colour temperature,
+time-of-day conditions, and similar behaviours are HA's responsibility and
+resume automatically once the coordinator recovers.
 
 ---
 
