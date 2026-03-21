@@ -14,7 +14,7 @@ This is a native Zigbee alternative to ESPHome-based LD2450 implementations. No 
 
 - **3-target tracking** — real-time X/Y coordinates (mm) for up to 3 people
 - **10 configurable zones** — custom polygon areas with 3–10 vertices each (e.g., "couch", "desk", "bed")
-- **Zigbee2MQTT integration** — 71 Home Assistant entities via external converter
+- **Zigbee2MQTT integration** — 90 Home Assistant entities via external converter
 - **OTA firmware updates** — remote updates via Zigbee2MQTT with automatic rollback if an update fails
 - **Coordinator fallback** — keeps lights working during coordinator or HA outages using direct Zigbee bindings and a heartbeat watchdog ([setup guide](docs/coordinator-fallback.md))
 - **All settings persist** — configuration survives reboots, even without a coordinator connection
@@ -119,7 +119,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 4. **Reconfigure** (if entities are missing):
    - Select the device in Z2M → click "Reconfigure"
-   - Refresh Home Assistant to see all 71 entities
+   - Refresh Home Assistant to see all 90 entities
 
 ## Firmware Updates (OTA)
 
@@ -159,7 +159,7 @@ Releases are fully automated via GitHub Actions — tagging a new version trigge
 
 ## Exposed Entities
 
-All 71 entities are automatically discovered in Home Assistant via Zigbee2MQTT.
+All 90 entities are automatically discovered in Home Assistant via Zigbee2MQTT.
 
 ### Sensors (Read-only)
 
@@ -185,8 +185,21 @@ All 71 entities are automatically discovered in Home Assistant via Zigbee2MQTT.
 | `coord_publishing` | Switch | ON/OFF | Enable coordinate output |
 | `occupancy_cooldown` | Numeric | 0–300 s | Delay before reporting Clear (main sensor) |
 | `occupancy_delay` | Numeric | 0–65535 ms | Delay before reporting Occupied (main sensor) |
+| `fallback_enable` | Switch | ON/OFF | Enable coordinator fallback system |
+| `fallback_mode` | Switch | ON/OFF | Hard fallback active (ON = sensor is controlling lights) |
+| `fallback_cooldown` | Numeric | 0–300 s | How long to keep light on after presence clears (main, fallback only) |
+| `heartbeat_enable` | Switch | ON/OFF | Enable software watchdog for HA/Z2M crash detection |
+| `heartbeat_interval` | Numeric | 30–3600 s | Expected ping interval (watchdog fires at 2× this) |
+| `hard_timeout_sec` | Numeric | 1–60 s | Seconds after first soft fault before escalating to hard fallback |
+| `ack_timeout_ms` | Numeric | 500–10000 ms | How long to wait for coordinator ACK before soft fallback |
 
-### Zone Configuration (4 entities per zone, 40 total)
+### Fallback Diagnostics (Read-only)
+
+| Entity | Type | Description |
+|--------|------|-------------|
+| `soft_fault` | Numeric | Network hiccup counter — increments on ACK timeout, clears on recovery |
+
+### Zone Configuration (5 entities per zone, 50 total)
 
 Each of the 10 zones has:
 
@@ -196,6 +209,7 @@ Each of the 10 zones has:
 | `zone_N_coords` | Text | Polygon vertices as CSV in metres: `x1,y1,x2,y2,...` |
 | `zone_N_cooldown` | Numeric (0–300 s) | Delay before reporting Clear for this zone |
 | `zone_N_delay` | Numeric (0–65535 ms) | Delay before reporting Occupied for this zone |
+| `fallback_cooldown_zone_N` | Numeric (0–300 s) | How long to keep light on after presence clears (fallback only) |
 
 ### Actions
 
@@ -203,8 +217,9 @@ Each of the 10 zones has:
 |--------|------|-------------|
 | `restart` | Select | Set to `restart` to reboot the device |
 | `factory_reset_confirm` | Text | Type `factory-reset` exactly to wipe everything |
+| `heartbeat` | Select | Set to `ping` to send a manual heartbeat |
 
-**Total**: 71 entities (11 occupancy, 7 config, 40 zone config, 8 diagnostic sensors, 2 actions, 3 target coordinates)
+**Total**: 90 entities (11 occupancy, 14 config, 50 zone config, 9 diagnostic sensors, 3 actions, 3 target coordinates)
 
 ## Configuration
 
