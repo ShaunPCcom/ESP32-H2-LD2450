@@ -43,6 +43,7 @@ layout:
 entities:
   - entity: ""
     name: Target1
+    mode: markers
     marker:
       size: 12
     line:
@@ -54,6 +55,7 @@ entities:
       - $ex hass.states["sensor.YOUR_DEVICE_ID_target_1_y"].state /1
   - entity: ""
     name: Target2
+    mode: markers
     marker:
       size: 12
     line:
@@ -65,6 +67,7 @@ entities:
       - $ex hass.states["sensor.YOUR_DEVICE_ID_target_2_y"].state /1
   - entity: ""
     name: Target3
+    mode: markers
     marker:
       size: 12
     line:
