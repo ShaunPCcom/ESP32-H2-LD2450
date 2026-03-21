@@ -5,9 +5,8 @@ blueprint:
 
     **Soft fallback** fires per-sensor when a single APS ACK times out — the
     sensor controls its bound light directly for a few seconds until the
-    coordinator responds. The `soft_fault` attribute increments so HA can
-    observe and react (e.g. suppress occupant count updates during transient
-    jitter).
+    coordinator responds. The `soft_fault` sensor entity increments so HA can
+    observe and react.
 
     **Hard fallback** activates if the coordinator is unreachable for
     `hard_timeout_sec` seconds. It is sticky and must be explicitly cleared
@@ -26,23 +25,24 @@ blueprint:
 
     **What this automation does:**
     - Sends a heartbeat ping to each sensor on the configured schedule.
-    - When a sensor enters **soft fallback** (`soft_fault` > 0), logs the event
-      (optional notify action available).
-    - When a sensor enters **hard fallback** (`fallback_mode` turns on), waits
-      for the configured recovery delay then clears it, allowing HA automations
-      to resume control of lights.
-    - Multi-sensor guard: if only one sensor enters hard fallback while others
-      remain normal, waits a re-check delay before deciding it's a real outage.
+    - When a sensor is in **hard fallback** (`fallback_mode` switch is on),
+      clears it on the next heartbeat cycle — allowing HA automations to
+      resume control of lights.
     - Clears hard fallback after Z2M reconnects (covers Z2M-only restarts where
       HA missed the fallback_mode transition while Z2M was offline).
     - Clears hard fallback after HA restarts (covers full server reboots).
+    - Optional: sends a persistent notification when a soft fault is detected.
 
   domain: automation
   author: LD2450-ZB-H2
   input:
     sensors:
       name: LD2450 Sensors
-      description: Select all LD2450-ZB-H2 sensors to watch.
+      description: >
+        Select the **main occupancy entity** for each LD2450-ZB-H2 sensor.
+        This is `binary_sensor.<device_name>_occupancy` (without a zone number).
+        The blueprint uses this to find the fallback_mode switch and soft_fault
+        sensor on the same device automatically.
       selector:
         entity:
           multiple: true
@@ -93,8 +93,9 @@ blueprint:
     notify_on_soft_fault:
       name: Notify on soft fault
       description: >
-        Send an HA persistent notification when a sensor enters soft fallback.
-        Useful for monitoring network jitter. Disable if too noisy.
+        Send an HA persistent notification when a sensor has a non-zero soft
+        fault count (checked each heartbeat cycle). Useful for monitoring
+        network jitter. Disable if too noisy.
       default: false
       selector:
         boolean:
@@ -107,19 +108,6 @@ trigger:
   - platform: time_pattern
     minutes: "/1"
     id: heartbeat
-
-  # Soft fault counter changed on any watched sensor
-  - platform: state
-    entity_id: !input sensors
-    attribute: soft_fault
-    id: soft_fault_change
-
-  # Hard fallback activated on any watched sensor
-  - platform: state
-    entity_id: !input sensors
-    attribute: fallback_mode
-    to: true
-    id: hard_fallback_detected
 
   # Z2M reconnect — re-check hard fallback after Z2M comes back online
   - platform: state
@@ -135,7 +123,7 @@ trigger:
 action:
   - choose:
 
-      # ---- Heartbeat ping ----
+      # ---- Heartbeat ping + fallback recovery ----
       - conditions:
           - condition: trigger
             id: heartbeat
@@ -148,50 +136,18 @@ action:
                     topic: >-
                       zigbee2mqtt/{{ device_attr(device_id(repeat.item), 'name') }}/set
                     payload: '{"heartbeat": "ping"}'
-                # If coordinator is reachable (ping went through) and sensor is in
-                # hard fallback, clear it — covers heartbeat recovery after watchdog timeout
+                # Find the fallback_mode switch on the same device
+                # If it's on, coordinator is reachable (ping went through) so clear it
                 - condition: template
                   value_template: >-
-                    {{ state_attr(repeat.item, 'fallback_mode') == true }}
+                    {% set dev = device_id(repeat.item) %}
+                    {% set fb = device_entities(dev) | select('search', 'fallback_mode') | list | first | default('') %}
+                    {{ fb != '' and is_state(fb, 'on') }}
                 - service: mqtt.publish
                   data:
                     topic: >-
                       zigbee2mqtt/{{ device_attr(device_id(repeat.item), 'name') }}/set
                     payload: '{"fallback_mode": false}'
-
-      # ---- Soft fault notification ----
-      - conditions:
-          - condition: trigger
-            id: soft_fault_change
-          - condition: template
-            value_template: >-
-              {{ trigger.to_state.attributes.soft_fault | int(0) > 0 }}
-          - condition: template
-            value_template: !input notify_on_soft_fault
-        sequence:
-          - service: persistent_notification.create
-            data:
-              title: "LD2450 Soft Fault"
-              message: >-
-                {{ state_attr(trigger.entity_id, 'friendly_name') }} entered soft
-                fallback (transient APS delay). Fault count:
-                {{ trigger.to_state.attributes.soft_fault | int(0) }}.
-                Coordinator responded — lights should be reconciled by HA.
-              notification_id: "ld2450_soft_fault_{{ trigger.entity_id }}"
-
-      # ---- Hard fallback recovery ----
-      - conditions:
-          - condition: trigger
-            id: hard_fallback_detected
-        sequence:
-          # Multi-sensor guard: check if other sensors are also in hard fallback
-          - delay:
-              seconds: !input multi_sensor_recheck_delay
-          - service: mqtt.publish
-            data:
-              topic: >-
-                zigbee2mqtt/{{ device_attr(device_id(trigger.entity_id), 'name') }}/set
-              payload: '{"fallback_mode": false}'
 
       # ---- Z2M reconnect recovery ----
       - conditions:
@@ -206,7 +162,9 @@ action:
               sequence:
                 - condition: template
                   value_template: >-
-                    {{ state_attr(repeat.item, 'fallback_mode') == true }}
+                    {% set dev = device_id(repeat.item) %}
+                    {% set fb = device_entities(dev) | select('search', 'fallback_mode') | list | first | default('') %}
+                    {{ fb != '' and is_state(fb, 'on') }}
                 - service: mqtt.publish
                   data:
                     topic: >-
@@ -223,10 +181,11 @@ action:
           - repeat:
               for_each: !input sensors
               sequence:
-                # Only clear if sensor is actually in hard fallback
                 - condition: template
                   value_template: >-
-                    {{ state_attr(repeat.item, 'fallback_mode') == true }}
+                    {% set dev = device_id(repeat.item) %}
+                    {% set fb = device_entities(dev) | select('search', 'fallback_mode') | list | first | default('') %}
+                    {{ fb != '' and is_state(fb, 'on') }}
                 - service: mqtt.publish
                   data:
                     topic: >-
