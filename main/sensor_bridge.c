@@ -121,11 +121,7 @@ static void sensor_poll_cb(uint8_t param)
 
     /* EP 1: Overall occupancy */
     bool occupied = state.occupied_global;
-    /* Use fallback cooldown if global fallback is active OR this EP is mid-session */
-    uint32_t main_cooldown_sec = (coordinator_fallback_is_active()
-                                  || coordinator_fallback_ep_session_active(0))
-        ? cfg.fallback_cooldown_sec[0]
-        : cfg.occupancy_cooldown_sec[0];
+    uint32_t main_cooldown_sec = cfg.occupancy_cooldown_sec[0];
     uint32_t main_cooldown_ticks = pdMS_TO_TICKS(main_cooldown_sec * 1000);
     int64_t main_delay_us = cfg.occupancy_delay_ms[0] * 1000LL;
 
@@ -188,11 +184,7 @@ static void sensor_poll_cb(uint8_t param)
     /* EPs 2-11: Per-zone occupancy */
     for (int i = 0; i < 10; i++) {
         bool zone_occ = state.zone_occupied[i];
-        /* Use fallback cooldown if global fallback is active OR this zone is mid-session */
-        uint32_t zone_cooldown_sec = (coordinator_fallback_is_active()
-                                      || coordinator_fallback_ep_session_active((uint8_t)(i + 1)))
-            ? cfg.fallback_cooldown_sec[i + 1]
-            : cfg.occupancy_cooldown_sec[i + 1];
+        uint32_t zone_cooldown_sec = cfg.occupancy_cooldown_sec[i + 1];
         uint32_t zone_cooldown_ticks = pdMS_TO_TICKS(zone_cooldown_sec * 1000);
         int64_t zone_delay_us = cfg.occupancy_delay_ms[i + 1] * 1000LL;
 
