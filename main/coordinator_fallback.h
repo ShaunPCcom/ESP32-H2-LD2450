@@ -8,12 +8,20 @@
  * Coordinator offline fallback module.
  *
  * When the Zigbee coordinator (Z2M/HA) stops ACKing occupancy reports within
- * ACK_TIMEOUT_MS, the device enters fallback mode and sends On/Off commands
- * directly to bound lights via the Zigbee binding table.
+ * the soft fallback timeout, the device enters soft fallback and sends On/Off
+ * commands directly to bound lights based on current occupancy.  No internal
+ * light state is tracked — the device sends On when occupied, Off when clear,
+ * regardless of assumed light state.
  *
- * Fallback mode is sticky — it persists in NVS across reboots and is only
- * cleared when HA explicitly writes fallback_mode=0.  No firmware code may
- * clear fallback mode except coordinator_fallback_clear().
+ * Soft fallback is transient — the first coordinator ACK clears it globally.
+ * If no ACK arrives within the hard fallback timeout (counted from soft
+ * activation), the device escalates to hard fallback: a sticky NVS-backed
+ * mode that persists across reboots until HA explicitly clears it.
+ *
+ * Cooldown switching: sensor_bridge uses fallback cooldown (instead of normal
+ * cooldown) whenever any fallback state is active for an endpoint, including
+ * the ACK-awaiting window.  This ensures occupancy holds long enough for the
+ * fallback system to act.
  *
  * Design notes:
  * - "Always armed": if On/Off bindings exist, fallback can activate. To
@@ -40,8 +48,9 @@ void coordinator_fallback_on_occupancy_change(uint8_t endpoint, bool occupied);
 bool coordinator_fallback_is_active(void);
 
 /**
- * Returns true if the given endpoint index entered occupancy under fallback.
- * Used by sensor_bridge to switch cooldown values for in-progress sessions.
+ * Returns true if the given endpoint is in any fallback-related state:
+ * awaiting ACK, soft fallback active, or hard fallback session active.
+ * Used by sensor_bridge to switch from normal to fallback cooldown.
  *
  * @param ep_idx  0=EP1/main, 1-10=EP2-11/zones
  */
