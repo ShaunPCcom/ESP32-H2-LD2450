@@ -343,6 +343,13 @@ static void configure_all_reporting(void)
 
 void sensor_bridge_start(void)
 {
+    static bool s_started = false;
+    if (s_started) {
+        ESP_LOGW(TAG, "sensor_bridge_start() called again — ignoring duplicate");
+        return;
+    }
+    s_started = true;
+
     ESP_LOGI(TAG, "Starting sensor bridge (poll every %d ms)", SENSOR_POLL_INTERVAL_MS);
     configure_all_reporting();
     esp_zb_scheduler_alarm(sensor_poll_cb, ALARM_PARAM_POLL, SENSOR_POLL_INTERVAL_MS);
