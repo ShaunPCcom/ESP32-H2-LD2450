@@ -33,7 +33,7 @@ static ButtonHandler *g_button = nullptr;
 
 static void apply_saved_config(const nvs_config_t *cfg)
 {
-    /* Apply software config to driver */
+    /* Apply software config to driver (no UART commands, safe immediately) */
     ld2450_set_tracking_mode(cfg->tracking_mode == 1 ? LD2450_TRACK_SINGLE : LD2450_TRACK_MULTI);
     ld2450_set_publish_coords(cfg->publish_coords != 0);
 
@@ -44,8 +44,17 @@ static void apply_saved_config(const nvs_config_t *cfg)
         ld2450_set_zone((size_t)i, &cfg->zones[i]);
     }
 
-    /* Allow sensor time to boot before sending commands */
-    vTaskDelay(pdMS_TO_TICKS(200));
+    /* Wait for sensor to prove it's alive before sending UART commands */
+    ESP_LOGI(TAG, "Waiting for LD2450 first data frame...");
+    esp_err_t err = ld2450_wait_for_first_frame(5000);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "LD2450 sensor not responding — skipping hardware config");
+        return;
+    }
+
+    /* Extra settle time after first frame */
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    ESP_LOGI(TAG, "Sensor ready — applying hardware config");
 
     /* Apply hardware config via sensor commands */
     if (cfg->bt_disabled) {
