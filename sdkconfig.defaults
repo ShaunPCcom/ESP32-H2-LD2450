@@ -1,18 +1,11 @@
 #
-# Partition Table
+# Partition Table (shared - target-specific files set the filename)
 #
 CONFIG_PARTITION_TABLE_CUSTOM=y
-CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_PARTITION_TABLE_OFFSET=0x8000
 
 #
-# Flash Size
-#
-CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
-CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
-
-#
-# Zigbee
+# Zigbee (shared - both H2 and C6 use native radio)
 #
 CONFIG_ZB_ENABLED=y
 CONFIG_ZB_ZCZR=y

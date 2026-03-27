@@ -1,0 +1,25 @@
+#
+# ESP32-C6 specific defaults
+#
+
+#
+# Partition Table
+#
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_c6.csv"
+
+#
+# Flash Size (16MB on nanoESP32-C6)
+#
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+#
+# WiFi (C6 only - needed for web configuration UI)
+#
+CONFIG_ESP_WIFI_ENABLED=y
+
+#
+# WiFi + Zigbee coexistence
+#
+CONFIG_ESP_COEX_ENABLED=y
+CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y

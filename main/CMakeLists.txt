@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "main.cpp"
+        "config_api.c"
         "coordinator_fallback.c"
         "ld2450_cli.c"
         "nvs_config.c"
@@ -12,6 +13,7 @@ idf_component_register(
         "."
     PRIV_REQUIRES
         nvs_flash
+        json
     REQUIRES
         ld2450
         espressif__esp-zigbee-lib

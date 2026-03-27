@@ -6,9 +6,7 @@
 #include "esp_zigbee_core.h"
 
 /* Project */
-#include "coordinator_fallback.h"
-#include "ld2450.h"
-#include "ld2450_cmd.h"
+#include "config_api.h"
 #include "ld2450_zone_csv.h"
 #include "nvs_config.h"
 #include "zigbee_attr_handler.h"
@@ -34,130 +32,39 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
     /* EP 1 custom cluster */
     if (ep == ZB_EP_MAIN && cluster == ZB_CLUSTER_LD2450_CONFIG) {
         switch (attr_id) {
-        case ZB_ATTR_MAX_DISTANCE: {
-            uint16_t dist = *(uint16_t *)val;
-            esp_err_t err = nvs_config_save_max_distance(dist);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to save max_distance to NVS: %s", esp_err_to_name(err));
-            }
-            nvs_config_t cfg;
-            nvs_config_get(&cfg);
-            ld2450_cmd_apply_distance_angle(cfg.max_distance_mm, cfg.angle_left_deg, cfg.angle_right_deg);
-            ESP_LOGI(TAG, "Max distance -> %u mm%s", dist, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            return ESP_OK;
-        }
-        case ZB_ATTR_ANGLE_LEFT: {
-            uint8_t deg = *(uint8_t *)val;
-            esp_err_t err = nvs_config_save_angle_left(deg);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to save angle_left to NVS: %s", esp_err_to_name(err));
-            }
-            nvs_config_t cfg;
-            nvs_config_get(&cfg);
-            ld2450_cmd_apply_distance_angle(cfg.max_distance_mm, cfg.angle_left_deg, cfg.angle_right_deg);
-            ESP_LOGI(TAG, "Angle left -> %u%s", deg, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            return ESP_OK;
-        }
-        case ZB_ATTR_ANGLE_RIGHT: {
-            uint8_t deg = *(uint8_t *)val;
-            esp_err_t err = nvs_config_save_angle_right(deg);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to save angle_right to NVS: %s", esp_err_to_name(err));
-            }
-            nvs_config_t cfg;
-            nvs_config_get(&cfg);
-            ld2450_cmd_apply_distance_angle(cfg.max_distance_mm, cfg.angle_left_deg, cfg.angle_right_deg);
-            ESP_LOGI(TAG, "Angle right -> %u%s", deg, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            return ESP_OK;
-        }
-        case ZB_ATTR_TRACKING_MODE: {
-            uint8_t mode = *(uint8_t *)val;
-            ld2450_set_tracking_mode(mode ? LD2450_TRACK_SINGLE : LD2450_TRACK_MULTI);
-            esp_err_t err = nvs_config_save_tracking_mode(mode);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to save tracking_mode to NVS: %s", esp_err_to_name(err));
-            }
-            ESP_LOGI(TAG, "Tracking mode -> %s%s", mode ? "single" : "multi", (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            return ESP_OK;
-        }
-        case ZB_ATTR_COORD_PUBLISHING: {
-            uint8_t en = *(uint8_t *)val;
-            ld2450_set_publish_coords(en != 0);
-            esp_err_t err = nvs_config_save_publish_coords(en);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to save publish_coords to NVS: %s", esp_err_to_name(err));
-            }
-            ESP_LOGI(TAG, "Coord publishing -> %s%s", en ? "on" : "off", (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            return ESP_OK;
-        }
-        case ZB_ATTR_OCCUPANCY_COOLDOWN: {
-            uint16_t sec = *(uint16_t *)val;
-            esp_err_t err = nvs_config_save_occupancy_cooldown(0, sec);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to save main occupancy_cooldown to NVS: %s", esp_err_to_name(err));
-            }
-            ESP_LOGI(TAG, "Main occupancy cooldown -> %u sec%s", sec, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            return ESP_OK;
-        }
-        case ZB_ATTR_OCCUPANCY_DELAY: {
-            uint16_t ms = *(uint16_t *)val;
-            esp_err_t err = nvs_config_save_occupancy_delay(0, ms);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to save main occupancy_delay to NVS: %s", esp_err_to_name(err));
-            }
-            ESP_LOGI(TAG, "Main occupancy delay -> %u ms%s", ms, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            return ESP_OK;
-        }
-        case ZB_ATTR_FALLBACK_MODE: {
-            uint8_t mode = *(uint8_t *)val;
-            if (mode == 0) {
-                coordinator_fallback_clear();
-            } else {
-                coordinator_fallback_set();
-            }
-            esp_err_t err = nvs_config_save_fallback_mode(mode);
-            ESP_LOGI(TAG, "Fallback mode -> %u%s", mode, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            return ESP_OK;
-        }
-        case ZB_ATTR_FALLBACK_COOLDOWN: {
-            uint16_t sec = *(uint16_t *)val;
-            esp_err_t err = nvs_config_save_fallback_cooldown(0, sec);
-            ESP_LOGI(TAG, "Fallback cooldown (main) -> %u sec%s", sec, (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            return ESP_OK;
-        }
-        case ZB_ATTR_HEARTBEAT_ENABLE: {
-            uint8_t enable = *(uint8_t *)val;
-            coordinator_fallback_set_heartbeat_enable(enable);
-            return ESP_OK;
-        }
-        case ZB_ATTR_HEARTBEAT_INTERVAL: {
-            uint16_t sec = *(uint16_t *)val;
-            coordinator_fallback_set_heartbeat_interval(sec);
-            return ESP_OK;
-        }
+        case ZB_ATTR_MAX_DISTANCE:
+            return config_api_set_max_distance(*(uint16_t *)val);
+        case ZB_ATTR_ANGLE_LEFT:
+            return config_api_set_angle_left(*(uint8_t *)val);
+        case ZB_ATTR_ANGLE_RIGHT:
+            return config_api_set_angle_right(*(uint8_t *)val);
+        case ZB_ATTR_TRACKING_MODE:
+            return config_api_set_tracking_mode(*(uint8_t *)val);
+        case ZB_ATTR_COORD_PUBLISHING:
+            return config_api_set_publish_coords(*(uint8_t *)val);
+        case ZB_ATTR_OCCUPANCY_COOLDOWN:
+            return config_api_set_occupancy_cooldown(0, *(uint16_t *)val);
+        case ZB_ATTR_OCCUPANCY_DELAY:
+            return config_api_set_occupancy_delay(0, *(uint16_t *)val);
+        case ZB_ATTR_FALLBACK_MODE:
+            return config_api_set_fallback_mode(*(uint8_t *)val);
+        case ZB_ATTR_FALLBACK_COOLDOWN:
+            return config_api_set_fallback_cooldown(0, *(uint16_t *)val);
+        case ZB_ATTR_HEARTBEAT_ENABLE:
+            return config_api_set_heartbeat_enable(*(uint8_t *)val);
+        case ZB_ATTR_HEARTBEAT_INTERVAL:
+            return config_api_set_heartbeat_interval(*(uint16_t *)val);
         case ZB_ATTR_HEARTBEAT:
-            coordinator_fallback_heartbeat();
-            return ESP_OK;
-        case ZB_ATTR_FALLBACK_ENABLE: {
-            uint8_t enable = *(uint8_t *)val;
-            coordinator_fallback_set_enable(enable);
-            ESP_LOGI(TAG, "Fallback enable -> %u", enable);
-            return ESP_OK;
-        }
-        case ZB_ATTR_HARD_TIMEOUT_SEC: {
-            uint8_t sec = *(uint8_t *)val;
-            coordinator_fallback_set_hard_timeout(sec);
-            return ESP_OK;
-        }
-        case ZB_ATTR_ACK_TIMEOUT_MS: {
-            uint16_t ms = *(uint16_t *)val;
-            coordinator_fallback_set_ack_timeout(ms);
-            return ESP_OK;
-        }
+            return config_api_heartbeat();
+        case ZB_ATTR_FALLBACK_ENABLE:
+            return config_api_set_fallback_enable(*(uint8_t *)val);
+        case ZB_ATTR_HARD_TIMEOUT_SEC:
+            return config_api_set_hard_timeout(*(uint8_t *)val);
+        case ZB_ATTR_ACK_TIMEOUT_MS:
+            return config_api_set_ack_timeout(*(uint16_t *)val);
         case ZB_ATTR_RESTART:
             zgb_ctrl_handle_restart();
             return ESP_OK;
-
         case ZB_ATTR_FACTORY_RESET: {
             extern void zigbee_full_factory_reset(void);
             zgb_ctrl_handle_factory_reset(*(uint8_t *)val, zigbee_full_factory_reset);
@@ -172,12 +79,8 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
     if (ep == ZB_EP_MAIN && cluster == ZB_CLUSTER_LD2450_CONFIG
             && attr_id >= ZB_ATTR_FALLBACK_ZONE_COOL_BASE
             && attr_id <= ZB_ATTR_FALLBACK_ZONE_COOL_BASE + 9) {
-        uint8_t zone_idx = (uint8_t)(attr_id - ZB_ATTR_FALLBACK_ZONE_COOL_BASE);  /* 0-9 → NVS index 1-10 */
-        uint16_t sec = *(uint16_t *)val;
-        esp_err_t err = nvs_config_save_fallback_cooldown((uint8_t)(zone_idx + 1), sec);
-        ESP_LOGI(TAG, "Fallback cooldown zone_%u -> %u sec%s", zone_idx + 1, sec,
-                 (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-        return ESP_OK;
+        uint8_t zone_idx = (uint8_t)(attr_id - ZB_ATTR_FALLBACK_ZONE_COOL_BASE);
+        return config_api_set_fallback_cooldown((uint8_t)(zone_idx + 1), *(uint16_t *)val);
     }
 
     /* EP1 zone config attributes (0x0040-0x006B) on cluster 0xFC00 */
@@ -187,51 +90,25 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
         int n   = (attr_id - 0x0040) / 4;   /* zone index 0..9 */
         int sub = (attr_id - 0x0040) % 4;   /* 0=vertex_count, 1=coords, 2=cooldown, 3=delay */
 
-        nvs_config_t cfg;
-        nvs_config_get(&cfg);
-
         if (sub == 0) {
-            /* vertex_count write */
-            uint8_t vc = *(uint8_t *)val;
-            if (vc > MAX_ZONE_VERTICES) vc = 0;  /* clamp invalid to disabled */
-            cfg.zones[n].vertex_count = vc;
-
-            /* Disabling a zone: zero coords and clear the ZCL coords attribute */
-            if (vc < 3) {
-                memset(cfg.zones[n].v, 0, sizeof(cfg.zones[n].v));
-                uint8_t empty_zcl[1] = { 0 };  /* ZCL string: length=0 */
-                esp_zb_zcl_set_attribute_val(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG,
-                    ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ATTR_ZONE_COORDS(n), empty_zcl, false);
-            }
-
-            esp_err_t ze = ld2450_set_zone((size_t)n, &cfg.zones[n]);
-            if (ze == ESP_OK) {
-                /* Valid zone (disabled or has real coords): save to NVS */
-                esp_err_t err = nvs_config_save_zone((uint8_t)n, &cfg.zones[n]);
-                ESP_LOGI(TAG, "zone_%d vertex_count -> %u%s", n + 1, vc,
-                         (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
-            } else {
-                /* vc >= 3 but no coords yet: update in-memory cache only.
-                 * The subsequent coords write will validate pairs==vc and
-                 * save the complete zone to NVS once coords are present. */
-                nvs_config_update_zone_cache((uint8_t)n, &cfg.zones[n]);
-                ESP_LOGI(TAG, "zone_%d vertex_count -> %u (pending coords, cache only)", n + 1, vc);
-            }
+            return config_api_set_zone_vertex_count((uint8_t)n, *(uint8_t *)val);
 
         } else if (sub == 1) {
-            /* coords CSV write — validate pair count before applying */
+            /* Extract CSV from ZCL CHAR_STRING (length-prefixed) */
             uint8_t *zcl_str = (uint8_t *)val;
             uint8_t len = zcl_str[0];
             char csv[ZB_ZONE_COORDS_MAX_LEN];
-            if (len >= ZB_ZONE_COORDS_MAX_LEN) len = ZB_ZONE_COORDS_MAX_LEN - 1;
+            if (len >= ZB_ZONE_COORDS_MAX_LEN) {
+                len = ZB_ZONE_COORDS_MAX_LEN - 1;
+            }
             memcpy(csv, zcl_str + 1, len);
             csv[len] = '\0';
 
-            int pairs = csv_count_pairs(csv);
-            if (pairs != cfg.zones[n].vertex_count) {
-                ESP_LOGW(TAG, "zone_%d coords rejected: expected %d pairs, got %d — reverting",
-                         n + 1, cfg.zones[n].vertex_count, pairs);
-                /* Write stored value back so Z2M sees the revert */
+            esp_err_t err = config_api_set_zone_coords((uint8_t)n, csv);
+            if (err == ESP_ERR_INVALID_ARG) {
+                /* Pair count mismatch — revert ZCL attribute to stored value */
+                nvs_config_t cfg;
+                nvs_config_get(&cfg);
                 char revert_csv[ZB_ZONE_COORDS_MAX_LEN - 1];
                 zone_to_csv(&cfg.zones[n], revert_csv, sizeof(revert_csv));
                 uint8_t revert_zcl[ZB_ZONE_COORDS_MAX_LEN];
@@ -239,29 +116,15 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
                 memcpy(revert_zcl + 1, revert_csv, revert_zcl[0]);
                 esp_zb_zcl_set_attribute_val(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG,
                     ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ATTR_ZONE_COORDS(n), revert_zcl, false);
-                return ESP_OK;
             }
-            csv_to_zone(csv, &cfg.zones[n]);
-            ld2450_set_zone((size_t)n, &cfg.zones[n]);
-            esp_err_t err = nvs_config_save_zone((uint8_t)n, &cfg.zones[n]);
-            ESP_LOGI(TAG, "zone_%d coords -> \"%s\"%s", n + 1, csv,
-                     (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            return ESP_OK;
 
         } else if (sub == 2) {
-            /* cooldown write (index n+1 in array: 0=main EP, 1-10=zones) */
-            uint16_t sec = *(uint16_t *)val;
-            esp_err_t err = nvs_config_save_occupancy_cooldown((uint8_t)(n + 1), sec);
-            ESP_LOGI(TAG, "zone_%d cooldown -> %u sec%s", n + 1, sec,
-                     (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            return config_api_set_occupancy_cooldown((uint8_t)(n + 1), *(uint16_t *)val);
 
         } else {
-            /* delay write */
-            uint16_t ms = *(uint16_t *)val;
-            esp_err_t err = nvs_config_save_occupancy_delay((uint8_t)(n + 1), ms);
-            ESP_LOGI(TAG, "zone_%d delay -> %u ms%s", n + 1, ms,
-                     (err == ESP_OK) ? " (saved)" : " (NVS FAILED)");
+            return config_api_set_occupancy_delay((uint8_t)(n + 1), *(uint16_t *)val);
         }
-        return ESP_OK;
     }
 
     return ESP_OK;
