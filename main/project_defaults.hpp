@@ -50,7 +50,7 @@
 namespace defaults {
 
 // ============================================================================
-// Hardware Configuration - ESP32-H2 GPIO Pin Assignments
+// Hardware Configuration - nanoESP32-C6 GPIO Pin Assignments
 // ============================================================================
 
 /**
@@ -71,10 +71,10 @@ constexpr uint8_t LD2450_UART_NUM = 1;  // UART_NUM_1
  * tracking mode, zone definitions). Command rate is low (~1 per second max),
  * so timing not critical.
  *
- * Why GPIO12: Paired with GPIO22 for UART1, good signal integrity at 256000 baud.
- * GPIO9 avoided (shared with BOOT button).
+ * Why GPIO10: Safe general-purpose GPIO on nanoESP32-C6. GPIO12 unavailable
+ * (USB D-), GPIO9 avoided (shared with BOOT button).
  */
-constexpr uint8_t LD2450_UART_TX_GPIO = 12;
+constexpr uint8_t LD2450_UART_TX_GPIO = 10;
 
 /**
  * GPIO for UART RX from LD2450 sensor (ESP32 RX <- Sensor TX)
@@ -84,10 +84,10 @@ constexpr uint8_t LD2450_UART_TX_GPIO = 12;
  * occupancy state. High reliability required - sensor data drives real-time
  * Zigbee occupancy reporting for Home Assistant automations.
  *
- * Why GPIO22: Natural pairing with GPIO12 for UART1. No conflicts with
- * Zigbee radio (2.4GHz) or other critical pins.
+ * Why GPIO11: Natural pairing with GPIO10 for UART1 on nanoESP32-C6.
+ * GPIO22 unavailable (SPI flash). No conflicts with radio or other pins.
  */
-constexpr uint8_t LD2450_UART_RX_GPIO = 22;
+constexpr uint8_t LD2450_UART_RX_GPIO = 11;
 
 /**
  * UART baud rate for LD2450 sensor communication (256000 bps)

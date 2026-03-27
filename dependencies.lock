@@ -82,5 +82,5 @@ direct_dependencies:
 - zigbee_core
 - zigbee_ota
 manifest_hash: 4a21ef379a599a899f21593ee1cc6847014b295f2f0589da8e335a35c49a86ed
-target: esp32h2
+target: esp32c6
 version: 2.0.0

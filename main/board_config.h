@@ -3,13 +3,13 @@
 #include "driver/gpio.h"
 #include "driver/uart.h"
 
-// ESP32-H2 + LD2450 wiring:
-// GPIO12: ESP32 TX -> LD2450 RX (commands to sensor)
-// GPIO22: ESP32 RX <- LD2450 TX (data from sensor)
-// (GPIO9 avoided for UART - shared with BOOT button)
+// nanoESP32-C6 + LD2450 wiring:
+// GPIO10: ESP32 TX -> LD2450 RX (commands to sensor)
+// GPIO11: ESP32 RX <- LD2450 TX (data from sensor)
+// (GPIO12 unavailable on C6 - USB D-, GPIO22 - SPI flash)
 #define LD2450_UART_NUM      UART_NUM_1
-#define LD2450_UART_TX_GPIO  GPIO_NUM_12
-#define LD2450_UART_RX_GPIO  GPIO_NUM_22
+#define LD2450_UART_TX_GPIO  GPIO_NUM_10
+#define LD2450_UART_RX_GPIO  GPIO_NUM_11
 #define LD2450_UART_BAUD     256000
 
 // BOOT button (active-low, internal pull-up)
