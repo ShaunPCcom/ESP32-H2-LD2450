@@ -2,18 +2,22 @@
 #include "web_server.h"
 
 #include "config_api.h"
+#include "sensor_bridge.h"
 #include "version.h"
 #include "wifi_manager.h"
 
 #include "cJSON.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_spiffs.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "ld2450.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -172,6 +176,60 @@ static const char OPERATIONAL_HTML[] =
     "</body></html>";
 
 /* ================================================================== */
+/*  SPIFFS static file serving                                         */
+/* ================================================================== */
+
+static bool s_spiffs_ok = false;
+
+static void mount_spiffs(void)
+{
+    esp_vfs_spiffs_conf_t conf = {
+        .base_path              = "/www",
+        .partition_label        = "www",
+        .max_files              = 6,
+        .format_if_mount_failed = false,
+    };
+    esp_err_t err = esp_vfs_spiffs_register(&conf);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "SPIFFS mount failed (%s) — using embedded fallback",
+                 esp_err_to_name(err));
+    } else {
+        s_spiffs_ok = true;
+        ESP_LOGI(TAG, "SPIFFS mounted at /www");
+    }
+}
+
+static esp_err_t serve_file(httpd_req_t *req, const char *path,
+                             const char *content_type)
+{
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        httpd_resp_send_404(req);
+        return ESP_OK;
+    }
+    httpd_resp_set_type(req, content_type);
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    char buf[2048];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+        if (httpd_resp_send_chunk(req, buf, (ssize_t)n) != ESP_OK) break;
+    }
+    fclose(f);
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+static esp_err_t handle_app_js(httpd_req_t *req)
+{
+    return serve_file(req, "/www/app.js", "application/javascript");
+}
+
+static esp_err_t handle_style_css(httpd_req_t *req)
+{
+    return serve_file(req, "/www/style.css", "text/css");
+}
+
+/* ================================================================== */
 /*  Helpers                                                            */
 /* ================================================================== */
 
@@ -217,6 +275,103 @@ static void send_redirect(httpd_req_t *req, const char *location)
     httpd_resp_set_status(req, "302 Found");
     httpd_resp_set_hdr(req, "Location", location);
     httpd_resp_sendstr(req, "");
+}
+
+/* ================================================================== */
+/*  WS /ws/targets — 2 Hz target stream                               */
+/* ================================================================== */
+
+static esp_err_t handle_ws_targets(httpd_req_t *req)
+{
+    if (req->method == HTTP_GET) {
+        ESP_LOGI(TAG, "WS /ws/targets: client connected fd=%d",
+                 httpd_req_to_sockfd(req));
+        return ESP_OK;
+    }
+    /* Push-only endpoint — drain any incoming frame and discard */
+    httpd_ws_frame_t frame = {};
+    esp_err_t err = httpd_ws_recv_frame(req, &frame, 0);
+    if (err == ESP_OK && frame.len) {
+        uint8_t *buf = calloc(1, frame.len);
+        if (buf) {
+            frame.payload = buf;
+            httpd_ws_recv_frame(req, &frame, frame.len);
+            free(buf);
+        }
+    }
+    return ESP_OK;
+}
+
+/* Push sensor state to all connected WebSocket clients at 2 Hz.
+ *
+ * The json[] buffer lives on this task's stack for the full 500 ms vTaskDelay.
+ * httpd_ws_send_frame_async() queues work to the httpd task which completes
+ * the actual socket send well within that window, so the pointer stays valid. */
+static void ws_push_task(void *arg)
+{
+    (void)arg;
+    /* Max open sockets matches cfg.max_open_sockets (default 7) */
+    static const size_t MAX_FDS = 8;
+
+    while (true) {
+        vTaskDelay(pdMS_TO_TICKS(500));  /* 2 Hz */
+
+        if (!s_server) continue;
+
+        /* Quick check: any WebSocket clients connected? */
+        size_t fds_count = MAX_FDS;
+        int fds[8];
+        if (httpd_get_client_list(s_server, &fds_count, fds) != ESP_OK) continue;
+
+        bool has_ws = false;
+        for (size_t i = 0; i < fds_count; i++) {
+            if (httpd_ws_get_fd_info(s_server, fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
+                has_ws = true;
+                break;
+            }
+        }
+        if (!has_ws) continue;
+
+        /* Read sensor state (thread-safe via spinlock in ld2450 driver) */
+        ld2450_state_t state;
+        if (ld2450_get_state(&state) != ESP_OK) continue;
+
+        /* Build compact JSON frame */
+        char json[192];
+        int n = 0;
+        n += snprintf(json + n, sizeof(json) - n, "{\"t\":[");
+        for (int i = 0; i < 3; i++) {
+            if (i) n += snprintf(json + n, sizeof(json) - n, ",");
+            n += snprintf(json + n, sizeof(json) - n, "{\"x\":%d,\"y\":%d,\"p\":%s}",
+                         (int)state.targets[i].x_mm,
+                         (int)state.targets[i].y_mm,
+                         state.targets[i].present ? "true" : "false");
+        }
+        n += snprintf(json + n, sizeof(json) - n, "],\"occ\":%s,\"z\":[",
+                     state.occupied_global ? "true" : "false");
+        for (int i = 0; i < 10; i++) {
+            if (i) n += snprintf(json + n, sizeof(json) - n, ",");
+            n += snprintf(json + n, sizeof(json) - n, "%s",
+                         state.zone_occupied[i] ? "true" : "false");
+        }
+        n += snprintf(json + n, sizeof(json) - n, "]}");
+
+        /* Send to every connected WebSocket client */
+        httpd_ws_frame_t frame = {
+            .type       = HTTPD_WS_TYPE_TEXT,
+            .payload    = (uint8_t *)json,
+            .len        = (size_t)n,
+            .final      = true,
+            .fragmented = false,
+        };
+        for (size_t i = 0; i < fds_count; i++) {
+            if (httpd_ws_get_fd_info(s_server, fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
+                httpd_ws_send_frame_async(s_server, fds[i], &frame);
+            }
+        }
+        /* json[] remains on stack for the next 500ms delay — valid until the
+         * httpd task has long finished processing all queued send operations. */
+    }
 }
 
 /* ================================================================== */
@@ -303,9 +458,17 @@ static esp_err_t handle_ncsi(httpd_req_t *req)
 
 static esp_err_t handle_root(httpd_req_t *req)
 {
+    if (wifi_manager_is_ap_mode()) {
+        httpd_resp_set_type(req, "text/html");
+        httpd_resp_sendstr(req, SETUP_HTML);
+        return ESP_OK;
+    }
+    /* Operational mode: serve LittleFS index.html; fallback to embedded page */
+    if (s_spiffs_ok) {
+        return serve_file(req, "/www/index.html", "text/html");
+    }
     httpd_resp_set_type(req, "text/html");
-    /* AP mode = provisioning; anything else = operational (STA connecting or connected) */
-    httpd_resp_sendstr(req, wifi_manager_is_ap_mode() ? SETUP_HTML : OPERATIONAL_HTML);
+    httpd_resp_sendstr(req, OPERATIONAL_HTML);
     return ESP_OK;
 }
 
@@ -409,6 +572,10 @@ static esp_err_t handle_post_config(httpd_req_t *req)
     }
 
     cJSON_Delete(root);
+
+    /* Notify sensor bridge so it pushes updated attrs to the ZCL table
+     * on the next poll cycle — keeps Z2M / HA in sync with web UI changes. */
+    sensor_bridge_mark_config_dirty();
 
     cJSON *resp = cJSON_CreateObject();
     cJSON_AddStringToObject(resp, "status", "ok");
@@ -594,6 +761,8 @@ static esp_err_t handle_not_found(httpd_req_t *req, httpd_err_code_t err)
 
 esp_err_t web_server_start(void)
 {
+    mount_spiffs();
+
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.lru_purge_enable  = true;
     cfg.stack_size        = 8192;  /* JSON serialization needs headroom */
@@ -607,6 +776,8 @@ esp_err_t web_server_start(void)
 
     static const httpd_uri_t uris[] = {
         { .uri = "/",                    .method = HTTP_GET,  .handler = handle_root           },
+        { .uri = "/app.js",              .method = HTTP_GET,  .handler = handle_app_js         },
+        { .uri = "/style.css",           .method = HTTP_GET,  .handler = handle_style_css      },
         { .uri = "/generate_204",        .method = HTTP_GET,  .handler = handle_generate_204   },
         { .uri = "/hotspot-detect.html", .method = HTTP_GET,  .handler = handle_hotspot_detect },
         { .uri = "/ncsi.txt",            .method = HTTP_GET,  .handler = handle_ncsi           },
@@ -623,7 +794,20 @@ esp_err_t web_server_start(void)
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
         httpd_register_uri_handler(s_server, &uris[i]);
     }
+
+    /* WebSocket endpoint — must set is_websocket = true */
+    static const httpd_uri_t ws_uri = {
+        .uri          = "/ws/targets",
+        .method       = HTTP_GET,
+        .handler      = handle_ws_targets,
+        .is_websocket = true,
+    };
+    httpd_register_uri_handler(s_server, &ws_uri);
+
     httpd_register_err_handler(s_server, HTTPD_404_NOT_FOUND, handle_not_found);
+
+    /* Start 2 Hz push task (operational mode — does nothing if no WS clients) */
+    xTaskCreate(ws_push_task, "ws_push", 4096, NULL, 4, NULL);
 
     ESP_LOGI(TAG, "HTTP server started on port 80");
     return ESP_OK;

@@ -83,12 +83,14 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
         return config_api_set_fallback_cooldown((uint8_t)(zone_idx + 1), *(uint16_t *)val);
     }
 
-    /* EP1 zone config attributes (0x0040-0x006B) on cluster 0xFC00 */
-    if (ep == ZB_EP_MAIN && cluster == ZB_CLUSTER_LD2450_CONFIG
-            && attr_id >= 0x0040 && attr_id <= 0x006B) {
+    /* Zone EP config attributes on cluster 0xFC00 (EP2-EP11, one zone per EP) */
+    if (ep >= ZB_EP_ZONE_BASE && ep < ZB_EP_ZONE_BASE + ZB_EP_ZONE_COUNT
+            && cluster == ZB_CLUSTER_LD2450_CONFIG) {
 
-        int n   = (attr_id - 0x0040) / 4;   /* zone index 0..9 */
-        int sub = (attr_id - 0x0040) % 4;   /* 0=vertex_count, 1=coords, 2=cooldown, 3=delay */
+        int n        = ep - ZB_EP_ZONE_BASE;               /* zone index 0..9 */
+        uint16_t base = ZB_ZONE_ATTR_BASE(n);
+        if (attr_id < base || attr_id > base + 3) return ESP_OK;
+        int sub = attr_id - base;  /* 0=vertex_count, 1=coords, 2=cooldown, 3=delay */
 
         if (sub == 0) {
             return config_api_set_zone_vertex_count((uint8_t)n, *(uint8_t *)val);
@@ -114,7 +116,7 @@ static esp_err_t handle_set_attr_value(const esp_zb_zcl_set_attr_value_message_t
                 uint8_t revert_zcl[ZB_ZONE_COORDS_MAX_LEN];
                 revert_zcl[0] = (uint8_t)strlen(revert_csv);
                 memcpy(revert_zcl + 1, revert_csv, revert_zcl[0]);
-                esp_zb_zcl_set_attribute_val(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG,
+                esp_zb_zcl_set_attribute_val(ZB_EP_ZONE(n), ZB_CLUSTER_LD2450_CONFIG,
                     ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ATTR_ZONE_COORDS(n), revert_zcl, false);
             }
             return ESP_OK;

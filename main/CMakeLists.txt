@@ -12,7 +12,7 @@ set(MAIN_SRCS
 
 if("${IDF_TARGET}" STREQUAL "esp32c6")
     list(APPEND MAIN_SRCS "wifi_manager.c" "web_server.c")
-    set(C6_PRIV_REQUIRES esp_wifi esp_netif esp_event esp_http_server espressif__mdns)
+    set(C6_PRIV_REQUIRES esp_wifi esp_netif esp_event esp_http_server espressif__mdns spiffs)
 else()
     set(C6_PRIV_REQUIRES "")
 endif()
@@ -31,3 +31,7 @@ idf_component_register(
         led_strip
     WHOLE_ARCHIVE
 )
+
+if("${IDF_TARGET}" STREQUAL "esp32c6")
+    spiffs_create_partition_image(www ../web FLASH_IN_PROJECT)
+endif()

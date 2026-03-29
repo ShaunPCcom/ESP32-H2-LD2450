@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LD2450</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+  <div class="logo">LD2450<em>·ZB</em></div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-host" id="hdr-host"></div>
+  <div class="ws-pill">
+    <div class="ws-dot" id="ws-dot"></div>
+    <span id="ws-label">offline</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Radar -->
+  <div class="radar-wrap">
+    <canvas id="cv"></canvas>
+    <div class="r-info">
+      <div class="r-info-row"><b>RANGE</b><span id="ov-range">—</span></div>
+      <div class="r-info-row"><b>TGTS</b><span id="ov-tgts">0</span></div>
+      <div class="r-info-row"><b>ZONES</b><span id="ov-zones">0/10</span></div>
+    </div>
+    <div class="edit-banner" id="edit-banner">ZONE EDIT MODE</div>
+    <div class="r-badge" id="r-badge">VACANT</div>
+  </div>
+
+  <!-- Settings -->
+  <div class="settings">
+    <nav class="tabs">
+      <button class="tab on" data-tab="sensor">Sensor</button>
+      <button class="tab" data-tab="occupancy">Occupancy</button>
+      <button class="tab" data-tab="zones">Zones</button>
+      <button class="tab" data-tab="fallback">Fallback</button>
+      <button class="tab" data-tab="wifi">WiFi</button>
+      <button class="tab" data-tab="system">System</button>
+    </nav>
+
+    <div class="tab-body">
+
+      <!-- SENSOR -->
+      <div class="pane on" id="pane-sensor">
+        <div class="sec">Detection Range</div>
+        <div class="field">
+          <div class="flabel">Max Distance <span class="fval" id="v-max_distance_mm">—</span></div>
+          <input type="range" min="500" max="6000" step="100"
+            data-key="max_distance_mm" data-unit="mm">
+        </div>
+
+        <div class="sec">Field of View</div>
+        <div class="field">
+          <div class="flabel">Left Angle <span class="fval" id="v-angle_left_deg">—</span></div>
+          <input type="range" min="0" max="60" step="1"
+            data-key="angle_left_deg" data-unit="°">
+        </div>
+        <div class="field">
+          <div class="flabel">Right Angle <span class="fval" id="v-angle_right_deg">—</span></div>
+          <input type="range" min="0" max="60" step="1"
+            data-key="angle_right_deg" data-unit="°">
+        </div>
+
+        <div class="sec">Mode</div>
+        <div class="tog-row">
+          <span class="tog-lbl">Multi-Target Tracking</span>
+          <label class="tog">
+            <input type="checkbox" data-key="tracking_mode" data-invert>
+            <div class="tog-track"></div><div class="tog-thumb"></div>
+          </label>
+        </div>
+        <div class="tog-row">
+          <span class="tog-lbl">Publish Coordinates</span>
+          <label class="tog">
+            <input type="checkbox" data-key="publish_coords">
+            <div class="tog-track"></div><div class="tog-thumb"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- OCCUPANCY -->
+      <div class="pane" id="pane-occupancy">
+        <div class="sec">Global Timing</div>
+        <div class="field">
+          <div class="flabel">Clear Cooldown <span class="fval" id="v-occupancy_cooldown_sec">—</span></div>
+          <input type="range" min="0" max="30" step="1"
+            data-key="occupancy_cooldown_sec" data-unit="s">
+        </div>
+        <div class="field">
+          <div class="flabel">Entry Delay <span class="fval" id="v-occupancy_delay_ms">—</span></div>
+          <input type="range" min="0" max="2000" step="50"
+            data-key="occupancy_delay_ms" data-unit="ms">
+        </div>
+      </div>
+
+      <!-- ZONES -->
+      <div class="pane" id="pane-zones">
+        <div class="zone-grid" id="zone-grid"></div>
+        <div id="zone-detail"></div>
+      </div>
+
+      <!-- FALLBACK -->
+      <div class="pane" id="pane-fallback">
+        <div class="sec">Coordinator Fallback</div>
+        <div class="field">
+          <div class="flabel">Mode</div>
+          <select data-key="fallback_mode">
+            <option value="0">Disabled</option>
+            <option value="1">Soft — per-zone assist</option>
+            <option value="2">Hard — full autonomy</option>
+          </select>
+        </div>
+        <div class="tog-row">
+          <span class="tog-lbl">Fallback Active</span>
+          <label class="tog">
+            <input type="checkbox" data-key="fallback_enable">
+            <div class="tog-track"></div><div class="tog-thumb"></div>
+          </label>
+        </div>
+
+        <div class="sec">Timeouts</div>
+        <div class="field">
+          <div class="flabel">Hard Timeout <span class="fval" id="v-hard_timeout_sec">—</span></div>
+          <input type="range" min="5" max="300" step="5"
+            data-key="hard_timeout_sec" data-unit="s">
+        </div>
+        <div class="field">
+          <div class="flabel">Ack Timeout <span class="fval" id="v-ack_timeout_ms">—</span></div>
+          <input type="range" min="500" max="30000" step="500"
+            data-key="ack_timeout_ms" data-unit="ms">
+        </div>
+        <div class="field">
+          <div class="flabel">Fallback Cooldown <span class="fval" id="v-fallback_cooldown_sec">—</span></div>
+          <input type="range" min="0" max="120" step="5"
+            data-key="fallback_cooldown_sec" data-unit="s">
+        </div>
+
+        <div class="sec">Heartbeat Watchdog</div>
+        <div class="tog-row">
+          <span class="tog-lbl">Enable Heartbeat</span>
+          <label class="tog">
+            <input type="checkbox" data-key="heartbeat_enable">
+            <div class="tog-track"></div><div class="tog-thumb"></div>
+          </label>
+        </div>
+        <div class="field">
+          <div class="flabel">Heartbeat Interval <span class="fval" id="v-heartbeat_interval_sec">—</span></div>
+          <input type="range" min="10" max="300" step="10"
+            data-key="heartbeat_interval_sec" data-unit="s">
+        </div>
+      </div>
+
+      <!-- WIFI -->
+      <div class="pane" id="pane-wifi">
+        <div class="sec">Connection</div>
+        <div class="stat-grid">
+          <div class="stat-row"><span class="stat-k">Hostname</span><span class="stat-v" id="wf-host">—</span></div>
+          <div class="stat-row"><span class="stat-k">WiFi</span><span class="stat-v" id="wf-state">—</span></div>
+        </div>
+        <br>
+        <button class="btn danger" onclick="wifiReset()">↺ Reconfigure WiFi</button>
+      </div>
+
+      <!-- SYSTEM -->
+      <div class="pane" id="pane-system">
+        <div class="sec">Device</div>
+        <div class="stat-grid">
+          <div class="stat-row"><span class="stat-k">Firmware</span><span class="stat-v" id="sy-fw">—</span></div>
+          <div class="stat-row"><span class="stat-k">Uptime</span><span class="stat-v" id="sy-up">—</span></div>
+          <div class="stat-row"><span class="stat-k">Free Heap</span><span class="stat-v" id="sy-heap">—</span></div>
+        </div>
+        <br>
+        <button class="btn" onclick="doRestart()">↺ Restart Device</button>
+        <button class="btn danger" onclick="doFactoryReset()">✕ Factory Reset</button>
+      </div>
+
+    </div><!-- /tab-body -->
+  </div><!-- /settings -->
+
+</div><!-- /layout -->
+
+<div id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>

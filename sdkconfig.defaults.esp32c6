@@ -19,6 +19,11 @@ CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
 CONFIG_ESP_WIFI_ENABLED=y
 
 #
+# HTTP server WebSocket support (for /ws/targets target stream)
+#
+CONFIG_HTTPD_WS_SUPPORT=y
+
+#
 # WiFi + Zigbee coexistence
 #
 CONFIG_ESP_COEX_ENABLED=y

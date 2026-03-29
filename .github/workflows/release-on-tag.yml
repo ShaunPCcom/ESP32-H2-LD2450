@@ -101,7 +101,7 @@ jobs:
         run: |
           git clone --recursive --branch v5.5.2 --depth 1 https://github.com/espressif/esp-idf.git
           cd esp-idf
-          ./install.sh esp32h2
+          ./install.sh esp32h2,esp32c6
 
       - name: Clone ESP Zigbee SDK
         run: |
@@ -109,19 +109,29 @@ jobs:
           git clone --recursive --branch main --depth 1 https://github.com/espressif/esp-zigbee-sdk.git
           ls -la esp-zigbee-sdk/tools/image_builder_tool/
 
-      - name: Build firmware
+      - name: Build firmware (H2)
         run: |
           . esp-idf/export.sh
-          idf.py build
+          idf.py -B build_h2 set-target esp32h2
+          idf.py -B build_h2 build
 
-          echo "✅ Firmware built successfully"
-          ls -lh build/ld2450_zb_h2.bin
+          echo "✅ H2 firmware built"
+          ls -lh build_h2/ld2450_zb_h2.bin
+
+      - name: Build firmware (C6)
+        run: |
+          . esp-idf/export.sh
+          idf.py -B build_c6 set-target esp32c6
+          idf.py -B build_c6 build
+
+          echo "✅ C6 firmware built"
+          ls -lh build_c6/ld2450_zb_h2.bin
 
       - name: Install zigpy for OTA image creation
         run: |
           python3 -m pip install zigpy
 
-      - name: Create OTA image
+      - name: Create OTA images
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           FILE_VERSION_HEX="${{ steps.version.outputs.file_version_hex }}"
@@ -131,10 +141,17 @@ jobs:
             -v ${FILE_VERSION_HEX} \
             -m 0x131B \
             -i 0x0001 \
-            -f build/ld2450_zb_h2.bin
+            -f build_h2/ld2450_zb_h2.bin
 
-          echo "✅ OTA image created"
-          ls -lh ld2450_zb_h2_v${VERSION}.ota
+          python3 esp-zigbee-sdk/tools/image_builder_tool/image_builder_tool.py \
+            -c ld2450_zb_c6_v${VERSION}.ota \
+            -v ${FILE_VERSION_HEX} \
+            -m 0x131B \
+            -i 0x0002 \
+            -f build_c6/ld2450_zb_h2.bin
+
+          echo "✅ OTA images created"
+          ls -lh ld2450_zb_h2_v${VERSION}.ota ld2450_zb_c6_v${VERSION}.ota
 
       - name: Generate release notes
         id: release_notes
@@ -170,7 +187,8 @@ jobs:
 
           gh release create "${TAG}" \
             ld2450_zb_h2_v${VERSION}.ota \
-            --title "LD2450-ZB-H2 ${TAG} [${CHANNEL}]" \
+            ld2450_zb_c6_v${VERSION}.ota \
+            --title "LD2450-ZB ${TAG} [${CHANNEL}]" \
             --notes-file ${{ steps.release_notes.outputs.notes_file }} \
             ${PRERELEASE_FLAG}
 
@@ -189,6 +207,12 @@ jobs:
               "imageType": 1,
               "fileVersion": ${FILE_VERSION_DEC},
               "url": "https://github.com/${{ github.repository }}/releases/download/${TAG}/ld2450_zb_h2_v${VERSION}.ota"
+            },
+            {
+              "manufacturerCode": 4891,
+              "imageType": 2,
+              "fileVersion": ${FILE_VERSION_DEC},
+              "url": "https://github.com/${{ github.repository }}/releases/download/${TAG}/ld2450_zb_c6_v${VERSION}.ota"
             }
           ]
           EOF
@@ -224,7 +248,7 @@ jobs:
           echo "📦 Version: ${{ steps.version.outputs.version }}"
           echo "🏷️  Tag: ${{ steps.version.outputs.tag }}"
           echo "📡 Channel: ${CHANNEL}"
-          echo "📄 OTA File: ld2450_zb_h2_v${{ steps.version.outputs.version }}.ota"
+          echo "📄 OTA Files: ld2450_zb_h2_v${{ steps.version.outputs.version }}.ota  ld2450_zb_c6_v${{ steps.version.outputs.version }}.ota"
           echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
           echo ""
           if [ "$CHANNEL" = "beta" ]; then

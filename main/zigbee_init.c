@@ -91,37 +91,37 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
 
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_MAX_DISTANCE,
         ESP_ZB_ZCL_ATTR_TYPE_U16,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &init_dist);
 
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_ANGLE_LEFT,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &init_al);
 
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_ANGLE_RIGHT,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &init_ar);
 
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_TRACKING_MODE,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &init_mode);
 
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_COORD_PUBLISHING,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &init_coords);
 
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_OCCUPANCY_COOLDOWN,
         ESP_ZB_ZCL_ATTR_TYPE_U16,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &init_cooldown);
 
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_OCCUPANCY_DELAY,
         ESP_ZB_ZCL_ATTR_TYPE_U16,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &init_delay);
 
     /* Crash diagnostics (read-only attributes for remote debugging) */
@@ -159,53 +159,6 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
         ESP_ZB_ZCL_ATTR_ACCESS_WRITE_ONLY,
         &s_factory_reset_attr);
 
-    /* Zone config attributes (0x0040-0x006B): 4 attrs × 10 zones on EP1 */
-    static uint8_t  s_zone_vc[10]  = {0};
-    static char     s_zone_csv[10][ZB_ZONE_COORDS_MAX_LEN]; /* ZCL CHAR_STRING buffers */
-    static uint16_t s_zone_cool[10] = {0};
-    static uint16_t s_zone_delay[10] = {250, 250, 250, 250, 250, 250, 250, 250, 250, 250};
-
-    /* Pre-populate from NVS so attributes are valid at registration time.
-     * Registering with an empty CHAR_STRING buffer causes set_attribute_val to
-     * produce garbled data on the first Z2M interview (root cause of NaN coords
-     * after OTA).  Each s_zone_csv[n] is a ZCL CHAR_STRING: [len][data...]. */
-    {
-        nvs_config_t cfg;
-        nvs_config_get(&cfg);
-        for (int n = 0; n < 10; n++) {
-            char tmp[ZB_ZONE_COORDS_MAX_LEN - 1];
-            zone_to_csv(&cfg.zones[n], tmp, sizeof(tmp));
-            size_t slen = strlen(tmp);
-            s_zone_csv[n][0] = (uint8_t)slen;
-            memcpy(s_zone_csv[n] + 1, tmp, slen);
-        }
-    }
-    for (int n = 0; n < 10; n++) {
-        esp_zb_custom_cluster_add_custom_attr(custom,
-            ZB_ATTR_ZONE_VERTEX_COUNT(n),
-            ESP_ZB_ZCL_ATTR_TYPE_U8,
-            ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
-            &s_zone_vc[n]);
-
-        esp_zb_custom_cluster_add_custom_attr(custom,
-            ZB_ATTR_ZONE_COORDS(n),
-            ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING,
-            ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
-            s_zone_csv[n]);
-
-        esp_zb_custom_cluster_add_custom_attr(custom,
-            ZB_ATTR_ZONE_COOLDOWN(n),
-            ESP_ZB_ZCL_ATTR_TYPE_U16,
-            ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
-            &s_zone_cool[n]);
-
-        esp_zb_custom_cluster_add_custom_attr(custom,
-            ZB_ATTR_ZONE_DELAY(n),
-            ESP_ZB_ZCL_ATTR_TYPE_U16,
-            ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
-            &s_zone_delay[n]);
-    }
-
     /* Fallback mode attribute (0x0024) — RW + reportable so coordinator sees transitions */
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_FALLBACK_MODE,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
@@ -224,11 +177,11 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     }
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_HEARTBEAT_ENABLE,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &s_hb_enable);
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_HEARTBEAT_INTERVAL,
         ESP_ZB_ZCL_ATTR_TYPE_U16,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &s_hb_interval);
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_HEARTBEAT,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
@@ -251,7 +204,7 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     }
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_FALLBACK_ENABLE,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &s_fb_enable);
     /* soft_fault: R+Report, firmware-only write; HA observes changes */
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_SOFT_FAULT,
@@ -260,11 +213,11 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
         &s_fb_zero_u8);
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_HARD_TIMEOUT_SEC,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &s_hard_to_sec);
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_ACK_TIMEOUT_MS,
         ESP_ZB_ZCL_ATTR_TYPE_U16,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &s_ack_to_ms);
 
     /* Fallback cooldown attributes (0x0025 = main, 0x0070-0x0079 = zones) */
@@ -280,13 +233,13 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     }
     esp_zb_custom_cluster_add_custom_attr(custom, ZB_ATTR_FALLBACK_COOLDOWN,
         ESP_ZB_ZCL_ATTR_TYPE_U16,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &s_fb_cool_main);
     for (int n = 0; n < 10; n++) {
         esp_zb_custom_cluster_add_custom_attr(custom,
             ZB_ATTR_FALLBACK_ZONE_COOL_BASE + n,
             ESP_ZB_ZCL_ATTR_TYPE_U16,
-            ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+            ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
             &s_fb_cool_zone[n]);
     }
 
@@ -315,9 +268,11 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     return cl;
 }
 
-/* Zone EPs (2-11) are occupancy-sensing only.
- * All zone geometry/cooldown/delay config lives on EP1 cluster 0xFC00. */
-static esp_zb_cluster_list_t *create_zone_ep_clusters(void)
+/* Zone EPs (2-11): occupancy sensing + per-zone config cluster 0xFC00.
+ * Each zone EP carries exactly 4 attrs for that zone (vertex_count, coords, cooldown, delay).
+ * Keeping each zone in its own cluster instance avoids the ZBoss CHAR_STRING reporting bug
+ * where only the first CHAR_STRING attr in a cluster fires independent reports. */
+static esp_zb_cluster_list_t *create_zone_ep_clusters(int zone_idx)
 {
     /* Basic cluster (required for Z2M re-interview — must carry mfr/model/sw_build_id) */
     esp_zb_basic_cluster_cfg_t basic_cfg = {
@@ -346,11 +301,70 @@ static esp_zb_cluster_list_t *create_zone_ep_clusters(void)
     };
     esp_zb_attribute_list_t *occ = esp_zb_occupancy_sensing_cluster_create(&occ_cfg);
 
-    /* Assemble — no custom cluster on zone EPs */
+    /* Zone config cluster: 4 attrs for this zone, pre-populated from NVS.
+     * Static arrays persist for the lifetime of the stack (ZBoss holds pointers). */
+    static uint8_t  s_zone_vc[ZB_EP_ZONE_COUNT];
+    static char     s_zone_csv[ZB_EP_ZONE_COUNT][ZB_ZONE_COORDS_MAX_LEN];
+    static uint16_t s_zone_cool[ZB_EP_ZONE_COUNT];
+    static uint16_t s_zone_delay[ZB_EP_ZONE_COUNT];
+    static bool     s_zone_inited = false;
+
+    if (!s_zone_inited) {
+        nvs_config_t cfg;
+        nvs_config_get(&cfg);
+        for (int n = 0; n < ZB_EP_ZONE_COUNT; n++) {
+            s_zone_vc[n]   = cfg.zones[n].vertex_count;
+            s_zone_cool[n] = cfg.occupancy_cooldown_sec[n + 1];
+            s_zone_delay[n] = cfg.occupancy_delay_ms[n + 1];
+            char tmp[ZB_ZONE_COORDS_MAX_LEN - 1];
+            zone_to_csv(&cfg.zones[n], tmp, sizeof(tmp));
+            size_t slen = strlen(tmp);
+            /* Pre-fill to maximum length so ZBoss allocates the full internal buffer.
+             * ZBoss allocates (length_byte + 1) bytes for its CHAR_STRING copy at
+             * registration. Registering with only the current string length means a
+             * longer update (more vertices) overflows into adjacent cooldown/delay
+             * attribute storage. The padded initial value is corrected by
+             * push_config_attrs() on the first poll after joining the network. */
+            memset(s_zone_csv[n] + 1, ' ', ZB_ZONE_COORDS_MAX_LEN - 1);
+            memcpy(s_zone_csv[n] + 1, tmp, slen);
+            s_zone_csv[n][0] = (uint8_t)(ZB_ZONE_COORDS_MAX_LEN - 1);
+        }
+        s_zone_inited = true;
+    }
+
+    int n = zone_idx;
+    esp_zb_attribute_list_t *zone_custom = esp_zb_zcl_attr_list_create(ZB_CLUSTER_LD2450_CONFIG);
+
+    esp_zb_custom_cluster_add_custom_attr(zone_custom,
+        ZB_ATTR_ZONE_VERTEX_COUNT(n),
+        ESP_ZB_ZCL_ATTR_TYPE_U8,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
+        &s_zone_vc[n]);
+
+    esp_zb_custom_cluster_add_custom_attr(zone_custom,
+        ZB_ATTR_ZONE_COORDS(n),
+        ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
+        s_zone_csv[n]);
+
+    esp_zb_custom_cluster_add_custom_attr(zone_custom,
+        ZB_ATTR_ZONE_COOLDOWN(n),
+        ESP_ZB_ZCL_ATTR_TYPE_U16,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
+        &s_zone_cool[n]);
+
+    esp_zb_custom_cluster_add_custom_attr(zone_custom,
+        ZB_ATTR_ZONE_DELAY(n),
+        ESP_ZB_ZCL_ATTR_TYPE_U16,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
+        &s_zone_delay[n]);
+
+    /* Assemble */
     esp_zb_cluster_list_t *cl = esp_zb_zcl_cluster_list_create();
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_basic_cluster(cl, basic, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cl, identify, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cl, occ, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+    ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cl, zone_custom, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
 
     /* On/Off CLIENT cluster on each zone EP — allows binding zone EP → light for fallback */
     esp_zb_attribute_list_t *on_off_client = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_ON_OFF);
@@ -384,7 +398,7 @@ static void zigbee_register_endpoints(void)
             .app_device_id  = ZB_DEVICE_ID_OCCUPANCY_SENSOR,
             .app_device_version = 0,
         };
-        ESP_ERROR_CHECK(esp_zb_ep_list_add_ep(ep_list, create_zone_ep_clusters(), zone_ep_cfg));
+        ESP_ERROR_CHECK(esp_zb_ep_list_add_ep(ep_list, create_zone_ep_clusters(i), zone_ep_cfg));
     }
 
     ESP_ERROR_CHECK(esp_zb_device_register(ep_list));
@@ -453,12 +467,13 @@ void zigbee_sync_zone_attrs_from_nvs(void)
     nvs_config_t cfg;
     nvs_config_get(&cfg);
 
-    for (int n = 0; n < 10; n++) {
+    for (int n = 0; n < ZB_EP_ZONE_COUNT; n++) {
         const ld2450_zone_t *z = &cfg.zones[n];
+        uint8_t ep = ZB_EP_ZONE(n);
 
         /* vertex_count */
         uint8_t vc = z->vertex_count;
-        esp_zb_zcl_set_attribute_val(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG,
+        esp_zb_zcl_set_attribute_val(ep, ZB_CLUSTER_LD2450_CONFIG,
             ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ATTR_ZONE_VERTEX_COUNT(n), &vc, false);
 
         /* coords CSV — ZCL CHAR_STRING: first byte = length */
@@ -467,15 +482,15 @@ void zigbee_sync_zone_attrs_from_nvs(void)
         uint8_t zcl_str[ZB_ZONE_COORDS_MAX_LEN];
         zcl_str[0] = (uint8_t)strlen(csv);
         memcpy(zcl_str + 1, csv, zcl_str[0]);
-        esp_zb_zcl_set_attribute_val(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG,
+        esp_zb_zcl_set_attribute_val(ep, ZB_CLUSTER_LD2450_CONFIG,
             ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ATTR_ZONE_COORDS(n), zcl_str, false);
 
         /* cooldown and delay (index n+1: 0=main EP, 1-10=zones) */
         uint16_t cool  = cfg.occupancy_cooldown_sec[n + 1];
         uint16_t delay = cfg.occupancy_delay_ms[n + 1];
-        esp_zb_zcl_set_attribute_val(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG,
+        esp_zb_zcl_set_attribute_val(ep, ZB_CLUSTER_LD2450_CONFIG,
             ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ATTR_ZONE_COOLDOWN(n), &cool, false);
-        esp_zb_zcl_set_attribute_val(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG,
+        esp_zb_zcl_set_attribute_val(ep, ZB_CLUSTER_LD2450_CONFIG,
             ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ATTR_ZONE_DELAY(n), &delay, false);
     }
 

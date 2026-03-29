@@ -220,11 +220,13 @@ const tzLocal = {
             const zoneVcMatch = key.match(/^zone_(\d+)_vertex_count$/);
             if (zoneVcMatch) {
                 const z = parseInt(zoneVcMatch[1]);
+                const n = z - 1;
+                const zoneEp = meta.device.getEndpoint(n + 2);
                 const validVc = Math.max(0, parseInt(value) || 0);
                 const coordsKey = `zone_${z}_coords`;
                 const stateUpdate = {[key]: String(validVc)};
 
-                await ep1.write('ld2450Config', {[`zone${z}VertexCount`]: validVc});
+                await zoneEp.write('ld2450Config', {[`zone${z}VertexCount`]: validVc});
 
                 if (validVc > 0) {
                     /* Parse current pairs from state (metres CSV) */
@@ -239,7 +241,7 @@ const tzLocal = {
 
                     const metresCoords = pairs.map(p => p.join(',')).join(',');
                     try {
-                        await ep1.write('ld2450Config', {[`zone${z}Coords`]: metresCsvToMm(metresCoords)});
+                        await zoneEp.write('ld2450Config', {[`zone${z}Coords`]: metresCsvToMm(metresCoords)});
                         stateUpdate[coordsKey] = metresCoords;
                     } catch (e) {
                         meta.logger.warn(`[ZB_LD2450] Coords resize failed: ${e.message}`);
@@ -256,8 +258,9 @@ const tzLocal = {
             const zoneCoordsMatch = key.match(/^zone_(\d+)_coords$/);
             if (zoneCoordsMatch) {
                 const n = parseInt(zoneCoordsMatch[1]) - 1;
+                const zoneEp = meta.device.getEndpoint(n + 2);
                 const mmCsv = metresCsvToMm(value);
-                await ep1.write('ld2450Config', {[`zone${n + 1}Coords`]: mmCsv});
+                await zoneEp.write('ld2450Config', {[`zone${n + 1}Coords`]: mmCsv});
                 return {state: {[key]: value}};
             }
 
@@ -265,7 +268,8 @@ const tzLocal = {
             const zoneCoolMatch = key.match(/^zone_(\d+)_cooldown$/);
             if (zoneCoolMatch) {
                 const n = parseInt(zoneCoolMatch[1]) - 1;
-                await ep1.write('ld2450Config', {[`zone${n + 1}Cooldown`]: value});
+                const zoneEp = meta.device.getEndpoint(n + 2);
+                await zoneEp.write('ld2450Config', {[`zone${n + 1}Cooldown`]: value});
                 return {state: {[key]: value}};
             }
 
@@ -273,11 +277,12 @@ const tzLocal = {
             const zoneDelayMatch = key.match(/^zone_(\d+)_delay$/);
             if (zoneDelayMatch) {
                 const n = parseInt(zoneDelayMatch[1]) - 1;
-                await ep1.write('ld2450Config', {[`zone${n + 1}Delay`]: value});
+                const zoneEp = meta.device.getEndpoint(n + 2);
+                await zoneEp.write('ld2450Config', {[`zone${n + 1}Delay`]: value});
                 return {state: {[key]: value}};
             }
 
-            /* Fallback zone cooldown (fallback_cooldown_zone_N → 0x0070+N) */
+            /* Fallback zone cooldown (fallback_cooldown_zone_N → 0x0070+N, stays on EP1) */
             const fbZoneCoolMatch = key.match(/^fallback_cooldown_zone_(\d+)$/);
             if (fbZoneCoolMatch) {
                 const n = parseInt(fbZoneCoolMatch[1]) - 1;  /* 0-indexed */
@@ -314,17 +319,18 @@ const tzLocal = {
             registerCustomClusters(meta.device);
             const ep1 = meta.device.getEndpoint(1);
 
-            /* Zone attrs */
+            /* Zone attrs — read from the zone's own EP */
             const zoneMatch = key.match(/^zone_(\d+)_(vertex_count|coords|cooldown|delay)$/);
             if (zoneMatch) {
                 const n = parseInt(zoneMatch[1]) - 1;
+                const zoneEp = meta.device.getEndpoint(n + 2);
                 const subMap = {
                     vertex_count: `zone${n + 1}VertexCount`,
                     coords:       `zone${n + 1}Coords`,
                     cooldown:     `zone${n + 1}Cooldown`,
                     delay:        `zone${n + 1}Delay`,
                 };
-                await ep1.read('ld2450Config', [subMap[zoneMatch[2]]]);
+                await zoneEp.read('ld2450Config', [subMap[zoneMatch[2]]]);
                 return;
             }
 
@@ -508,13 +514,50 @@ const exposesDefinition = [
         description: 'Type "factory-reset" exactly and press Set to perform a full factory reset. Erases all settings and Zigbee network data.'},
 ];
 
+// ---- Shared configure helpers ----
+
+async function configureBindingsAndReads(device, coordinatorEndpoint) {
+    const ep1 = device.getEndpoint(1);
+
+    await ep1.bind('msOccupancySensing', coordinatorEndpoint);
+    await ep1.configureReporting('msOccupancySensing', [
+        {attribute: 'occupancy', minimumReportInterval: 0,
+         maximumReportInterval: 300, reportableChange: 0},
+    ]);
+    await ep1.bind('ld2450Config', coordinatorEndpoint);
+
+    /* Read all EP1 config attrs (zone config now lives on EP2-EP11) */
+    await ep1.read('ld2450Config', [
+        'targetCount', 'targetCoords', 'maxDistance', 'angleLeft', 'angleRight',
+        'trackingMode', 'coordPublishing', 'occupancyCooldown', 'occupancyDelay',
+        'fallbackMode', 'fallbackCooldown',
+        'fallbackEnable', 'hardTimeoutSec', 'ackTimeoutMs',
+        'heartbeatEnable', 'heartbeatInterval',
+        'bootCount', 'resetReason', 'lastUptimeSec', 'minFreeHeap',
+    ]);
+
+    /* EPs 2-11: occupancy + per-zone config cluster */
+    for (let n = 0; n < 10; n++) {
+        const zoneEp = device.getEndpoint(n + 2);
+        await zoneEp.bind('msOccupancySensing', coordinatorEndpoint);
+        await zoneEp.configureReporting('msOccupancySensing', [
+            {attribute: 'occupancy', minimumReportInterval: 0,
+             maximumReportInterval: 300, reportableChange: 0},
+        ]);
+        await zoneEp.bind('ld2450Config', coordinatorEndpoint);
+        await zoneEp.read('ld2450Config', [
+            `zone${n + 1}VertexCount`,
+            `zone${n + 1}Coords`,
+            `zone${n + 1}Cooldown`,
+            `zone${n + 1}Delay`,
+        ]);
+    }
+}
+
 // ---- Device definition ----
 
-const definition = {
-    zigbeeModel: ['LD2450-H2'],
-    model: 'LD2450-ZB-H2',
+const sharedBase = {
     vendor: 'LD2450Z',
-    description: 'HLK-LD2450 mmWave presence sensor (Zigbee, ESP32-H2)',
     fromZigbee: [fzLocal.occupancy, fzLocal.config],
     toZigbee: [tzLocal.config, tzLocal.restart, tzLocal.factory_reset],
     exposes: exposesDefinition,
@@ -531,57 +574,74 @@ const definition = {
             registerCustomClusters(device);
         }
     },
+};
+
+/* H2: reporting only for live sensor data + fallback mode.
+ * Writable config attrs do not yet have ACCESS_REPORTING in firmware —
+ * full pipeline 2 support pending H2 firmware update. */
+const definition = {
+    ...sharedBase,
+    zigbeeModel: ['LD2450-H2'],
+    model: 'LD2450-ZB-H2',
+    description: 'HLK-LD2450 mmWave presence sensor (Zigbee, ESP32-H2)',
     configure: async (device, coordinatorEndpoint) => {
         registerCustomClusters(device);
-
         const ep1 = device.getEndpoint(1);
-
-        /* EP1: occupancy + config reporting */
-        await ep1.bind('msOccupancySensing', coordinatorEndpoint);
-        await ep1.configureReporting('msOccupancySensing', [
-            {attribute: 'occupancy', minimumReportInterval: 0,
-             maximumReportInterval: 300, reportableChange: 0},
-        ]);
-        await ep1.bind('ld2450Config', coordinatorEndpoint);
+        await configureBindingsAndReads(device, coordinatorEndpoint);
         await ep1.configureReporting('ld2450Config', [
-            {attribute: 'targetCount', minimumReportInterval: 0,
-             maximumReportInterval: 300, reportableChange: 1},
-            {attribute: 'targetCoords', minimumReportInterval: 0,
-             maximumReportInterval: 300},
-            /* fallback_mode: report on any change (delta=0) so HA sees transitions promptly */
-            {attribute: 'fallbackMode', minimumReportInterval: 0,
-             maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'targetCount',  minimumReportInterval: 0, maximumReportInterval: 300,  reportableChange: 1},
+            {attribute: 'targetCoords', minimumReportInterval: 0, maximumReportInterval: 300},
+            {attribute: 'fallbackMode', minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
         ]);
+    },
+};
 
-        /* Read all EP1 config + zone config attrs */
-        await ep1.read('ld2450Config', [
-            'targetCount', 'targetCoords', 'maxDistance', 'angleLeft', 'angleRight',
-            'trackingMode', 'coordPublishing', 'occupancyCooldown', 'occupancyDelay',
-            'fallbackMode', 'fallbackCooldown',
-            'fallbackEnable', 'hardTimeoutSec', 'ackTimeoutMs',
-            'heartbeatEnable', 'heartbeatInterval',
-            'bootCount', 'resetReason', 'lastUptimeSec', 'minFreeHeap',
+/* C6: full reporting on all writable config + zone attrs.
+ * Requires firmware with ACCESS_REPORTING on writable attrs (v2.2.0+).
+ * Enables pipeline 2: device-side changes (CLI/web) propagate automatically to Z2M/HA. */
+const definitionC6 = {
+    ...sharedBase,
+    zigbeeModel: ['LD2450-C6'],
+    model: 'LD2450-ZB-C6',
+    description: 'HLK-LD2450 mmWave presence sensor (Zigbee+WiFi, ESP32-C6)',
+    configure: async (device, coordinatorEndpoint) => {
+        registerCustomClusters(device);
+        const ep1 = device.getEndpoint(1);
+        await configureBindingsAndReads(device, coordinatorEndpoint);
+        /* Split into small batches to stay within ZCL frame size limits */
+        await ep1.configureReporting('ld2450Config', [
+            {attribute: 'targetCount',      minimumReportInterval: 0, maximumReportInterval: 300,  reportableChange: 1},
+            {attribute: 'targetCoords',     minimumReportInterval: 0, maximumReportInterval: 300},
+            {attribute: 'fallbackMode',     minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'maxDistance',      minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'angleLeft',        minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
         ]);
-        /* Read zone config attrs one zone at a time — 40 attrs in one frame exceeds ZCL frame limits */
+        await ep1.configureReporting('ld2450Config', [
+            {attribute: 'angleRight',       minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'trackingMode',     minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'coordPublishing',  minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'occupancyCooldown',minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'occupancyDelay',   minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+        ]);
+        await ep1.configureReporting('ld2450Config', [
+            {attribute: 'fallbackEnable',   minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'fallbackCooldown', minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'hardTimeoutSec',   minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'ackTimeoutMs',     minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'heartbeatEnable',  minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+            {attribute: 'heartbeatInterval',minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+        ]);
+        /* Zone config attrs — each zone on its own EP, one call per EP */
         for (let n = 0; n < 10; n++) {
-            await ep1.read('ld2450Config', [
-                `zone${n + 1}VertexCount`,
-                `zone${n + 1}Coords`,
-                `zone${n + 1}Cooldown`,
-                `zone${n + 1}Delay`,
-            ]);
-        }
-
-        /* EPs 2-11: occupancy sensing only (zone config lives on EP1) */
-        for (let z = 0; z < 10; z++) {
-            const ep = device.getEndpoint(z + 2);
-            await ep.bind('msOccupancySensing', coordinatorEndpoint);
-            await ep.configureReporting('msOccupancySensing', [
-                {attribute: 'occupancy', minimumReportInterval: 0,
-                 maximumReportInterval: 300, reportableChange: 0},
+            const zoneEp = device.getEndpoint(n + 2);
+            await zoneEp.configureReporting('ld2450Config', [
+                {attribute: `zone${n + 1}VertexCount`, minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+                {attribute: `zone${n + 1}Coords`,      minimumReportInterval: 0, maximumReportInterval: 3600},
+                {attribute: `zone${n + 1}Cooldown`,    minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
+                {attribute: `zone${n + 1}Delay`,       minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 0},
             ]);
         }
     },
 };
 
-module.exports = [definition];
+module.exports = [definition, definitionC6];
