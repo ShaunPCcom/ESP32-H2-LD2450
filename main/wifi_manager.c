@@ -385,6 +385,12 @@ static void start_sta_mode(const char *ssid, const char *pass)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_cfg));
     ESP_ERROR_CHECK(esp_wifi_start());
+#if CONFIG_IDF_TARGET_ESP32C6
+    /* MIN_MODEM power save: STA sleeps between DTIM beacons, freeing the
+     * shared 2.4GHz radio for Zigbee during idle periods. Wi-Fi stays
+     * connected and responds promptly when traffic is active. */
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+#endif
 }
 
 /* ================================================================== */

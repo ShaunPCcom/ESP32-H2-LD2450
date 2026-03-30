@@ -261,8 +261,10 @@ static esp_zb_cluster_list_t *create_main_ep_clusters(void)
     ota_cfg.manufacturer_code = 0x131B;  /* Espressif */
 #if CONFIG_IDF_TARGET_ESP32C6
     ota_cfg.image_type = 0x0003;         /* LD2450 C6 application */
+    ota_cfg.max_data_size = 223;         /* larger blocks for coex throughput */
 #else
     ota_cfg.image_type = 0x0001;         /* LD2450 H2 application */
+    ota_cfg.max_data_size = 128;         /* more efficient than default 64 */
 #endif
     ota_cfg.current_file_version = FIRMWARE_VERSION;  /* Derived from version.h */
     ota_cfg.hw_version = 1;
