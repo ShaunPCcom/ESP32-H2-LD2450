@@ -17,7 +17,7 @@ This is a native Zigbee alternative to ESPHome-based LD2450 implementations. ESP
 - **Independent zone reporting** — each zone reports changes individually with no batching or polling delays
 - **Low Zigbee chatter** — log-on-change reporting; coordinate publishing can be disabled for minimal traffic
 - **Z2M integration** — rich Home Assistant entity model via external converter
-- **OTA updates** — remote firmware updates via Z2M with automatic rollback on failure
+- **OTA updates** — remote firmware updates via Z2M with automatic rollback on failure; C6 uses Wi-Fi transport when available for faster updates, and includes a web UI with one-click update trigger and configurable background check interval
 - **Coordinator fallback** — maintains light control if Z2M or HA goes down; direct Zigbee bindings and a heartbeat watchdog preserve occupancy behavior ([setup guide](docs/coordinator-fallback.md))
 - **Config persists** — all settings survive reboots without requiring a coordinator connection
 - **Crash diagnostics** — boot count, reset reason, uptime, and heap tracked for remote debugging
@@ -171,18 +171,24 @@ When a new version is available, Home Assistant shows an update notification via
 4. Device reboots automatically after a successful update
 
 **Via Zigbee2MQTT UI:**
-1. Select the device → go to the "About" tab
+1. Select the device → go to the OTA section
 2. Click "Update to latest firmware"
 3. Watch the progress bar
 
 ### How It Works
 
+**ESP32-H2:**
 1. **Download**: Firmware transfers over Zigbee in 64-byte blocks (~2–5 minutes)
 2. **Validation**: Device verifies the image before applying
 3. **Reboot**: Device boots into the new firmware
 4. **Rollback**: If the new firmware fails, the bootloader reverts automatically
 
-The device checks for updates every 24 hours. Trigger a manual check from the Z2M "About" tab.
+**ESP32-C6** (when Wi-Fi is connected):
+1. **Download**: Firmware downloads over HTTPS in seconds rather than minutes
+2. **Validation** and **Reboot** same as H2
+3. Falls back to Zigbee transport automatically if Wi-Fi is unavailable
+
+The device checks for updates every 12 hours by default. On C6 the interval is configurable (1–72 hours) in the System tab of the web UI. Trigger a manual check from the Z2M OTA section or the web UI.
 
 ### Hosting and Releases
 

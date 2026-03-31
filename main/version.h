@@ -38,7 +38,7 @@
  * Patch version number (0-255)
  * Increment for bug fixes and minor improvements
  */
-#define FW_VERSION_PATCH 3
+#define FW_VERSION_PATCH 4
 
 /* ============================================================================
  * DERIVED CONSTANTS - Do not modify, these are generated automatically
