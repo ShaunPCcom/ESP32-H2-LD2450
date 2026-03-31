@@ -16,6 +16,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "ld2450.h"
+#include "zigbee_ota.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -745,6 +746,52 @@ static esp_err_t handle_factory_reset(httpd_req_t *req)
 }
 
 /* ================================================================== */
+/*  POST /api/ota — trigger Wi-Fi firmware update                      */
+/* ================================================================== */
+
+static esp_err_t handle_post_ota(httpd_req_t *req)
+{
+    /* Optional JSON body: { "url": "https://..." } to override the default index.
+     * No body = use built-in OTA index URL. */
+    char *body = read_body(req);
+    const char *url = NULL;
+    cJSON *root = NULL;
+
+    if (body) {
+        root = cJSON_Parse(body);
+        if (root) {
+            cJSON *url_j = cJSON_GetObjectItemCaseSensitive(root, "url");
+            if (cJSON_IsString(url_j) && url_j->valuestring[0] != '\0') {
+                url = url_j->valuestring;  /* valid until cJSON_Delete(root) */
+            }
+        }
+    }
+
+    esp_err_t ret = zigbee_ota_start_wifi_update(url);  /* copies url internally */
+
+    cJSON_Delete(root);
+    free(body);
+
+    if (ret == ESP_OK) {
+        httpd_resp_set_status(req, "202 Accepted");
+    } else if (ret == ESP_ERR_INVALID_STATE) {
+        httpd_resp_set_status(req, "409 Conflict");
+    }
+
+    cJSON *resp = cJSON_CreateObject();
+    if (ret == ESP_OK) {
+        cJSON_AddStringToObject(resp, "status", "update_started");
+    } else {
+        cJSON_AddStringToObject(resp, "error",
+            ret == ESP_ERR_INVALID_STATE ? "OTA already in progress"
+                                         : "Failed to start OTA");
+    }
+    send_json(req, 200, resp);  /* status already set above; 200 = no override */
+    cJSON_Delete(resp);
+    return ESP_OK;
+}
+
+/* ================================================================== */
 /*  404 handler — redirect unknown URIs to / (catches all OS probes)  */
 /* ================================================================== */
 
@@ -789,6 +836,7 @@ esp_err_t web_server_start(void)
         { .uri = "/api/wifi-reset",      .method = HTTP_POST, .handler = handle_wifi_reset     },
         { .uri = "/api/restart",         .method = HTTP_POST, .handler = handle_restart        },
         { .uri = "/api/factory-reset",   .method = HTTP_POST, .handler = handle_factory_reset  },
+        { .uri = "/api/ota",           .method = HTTP_POST, .handler = handle_post_ota       },
     };
 
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
