@@ -752,10 +752,10 @@ static esp_err_t handle_factory_reset(httpd_req_t *req)
 
 static esp_err_t handle_post_ota(httpd_req_t *req)
 {
-    /* Optional JSON body: { "url": "https://..." } to override the default index.
-     * No body = use built-in OTA index URL. */
+    /* Optional JSON body: { "url": "https://..." } to override the configured index.
+     * No body = use the configured OTA index URL (same as background checks). */
     char *body = read_body(req);
-    const char *url = NULL;
+    const char *url = ota_check_get_index_url();  /* default: configured URL */
     cJSON *root = NULL;
 
     if (body) {
