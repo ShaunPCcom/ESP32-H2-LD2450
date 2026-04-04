@@ -29,6 +29,7 @@ idf_component_register(
         espressif__esp-zigbee-lib
         espressif__esp-zboss-lib
         led_strip
+        zigbee_ota
     WHOLE_ARCHIVE
 )
 

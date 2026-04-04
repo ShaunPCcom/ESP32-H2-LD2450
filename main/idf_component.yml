@@ -21,6 +21,7 @@ dependencies:
   zigbee_ota:
     git: https://github.com/ShaunPCcom/esp32-zigbee-ota.git
     version: "main"
+
   board_led:
     git: https://github.com/ShaunPCcom/esp32-zigbee-common.git
     path: board_led
