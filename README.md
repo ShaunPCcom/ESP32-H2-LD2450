@@ -188,6 +188,8 @@ When a new version is available, Home Assistant shows an update notification via
 2. **Validation** and **Reboot** same as H2
 3. Falls back to Zigbee transport automatically if Wi-Fi is unavailable
 
+> **Known limitation (C6 Wi-Fi transport):** After a Wi-Fi OTA completes, Z2M may continue showing the OTA progress bar until its upgrade timeout is reached (~150 s), after which the firmware may still show as needing an update. This clears when an update check is triggered or another update attempt is made from Z2M.
+
 The device checks for updates every 12 hours by default. On C6 the interval is configurable (1–72 hours) in the System tab of the web UI. Trigger a manual check from the Z2M OTA section or the web UI.
 
 ### Hosting and Releases
