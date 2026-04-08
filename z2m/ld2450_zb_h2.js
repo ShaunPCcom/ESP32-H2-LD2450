@@ -526,12 +526,18 @@ async function configureBindingsAndReads(device, coordinatorEndpoint) {
     ]);
     await ep1.bind('ld2450Config', coordinatorEndpoint);
 
-    /* Read all EP1 config attrs (zone config now lives on EP2-EP11) */
+    /* Read EP1 config attrs in small batches to avoid ZCL INSUFFICIENT_SPACE */
     await ep1.read('ld2450Config', [
         'targetCount', 'targetCoords', 'maxDistance', 'angleLeft', 'angleRight',
+    ]);
+    await ep1.read('ld2450Config', [
         'trackingMode', 'coordPublishing', 'occupancyCooldown', 'occupancyDelay',
-        'fallbackMode', 'fallbackCooldown',
-        'fallbackEnable', 'hardTimeoutSec', 'ackTimeoutMs',
+    ]);
+    await ep1.read('ld2450Config', [
+        'fallbackMode', 'fallbackCooldown', 'fallbackEnable',
+        'hardTimeoutSec', 'ackTimeoutMs',
+    ]);
+    await ep1.read('ld2450Config', [
         'heartbeatEnable', 'heartbeatInterval',
         'bootCount', 'resetReason', 'lastUptimeSec', 'minFreeHeap',
     ]);
