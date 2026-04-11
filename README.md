@@ -17,7 +17,7 @@ This is a native Zigbee alternative to ESPHome-based LD2450 implementations. ESP
 - **Independent zone reporting** — each zone reports changes individually with no batching or polling delays
 - **Low Zigbee chatter** — log-on-change reporting; coordinate publishing can be disabled for minimal traffic
 - **Z2M integration** — rich Home Assistant entity model via external converter
-- **OTA updates** — remote firmware updates via Z2M with automatic rollback on failure; C6 uses Wi-Fi transport when available for faster updates, and includes a web UI with one-click update trigger and configurable background check interval
+- **OTA updates** — remote firmware updates via Z2M with automatic rollback on failure; C6 uses Wi-Fi transport when available for faster updates, includes a web UI with one-click update trigger and configurable background check interval, and supports manual `.ota` file upload directly from the browser
 - **Coordinator fallback** — maintains light control if Z2M or HA goes down; direct Zigbee bindings and a heartbeat watchdog preserve occupancy behavior ([setup guide](docs/coordinator-fallback.md))
 - **Config persists** — all settings survive reboots without requiring a coordinator connection
 - **Crash diagnostics** — boot count, reset reason, uptime, and heap tracked for remote debugging
@@ -32,7 +32,7 @@ This Zigbee implementation offers different trade-offs compared to ESPHome-based
 ### Advantages of Zigbee
 
 - **Native Zigbee** — no WiFi required on H2, works with any Zigbee coordinator
-- **Mesh networking** — router-capable, extends your Zigbee network range
+- **Mesh networking** — H2 is a full Zigbee router and extends your mesh; C6 runs as an end device (WiFi+router coexistence is unsupported on the C6 radio)
 - **Device-local config** — all settings stored on-device, not in the coordinator
 - **Multi-endpoint architecture** — multiple endpoints for cleaner HA organization
 - **Arbitrary polygon zones** — up to 10 configurable areas (3–10 vertices each)
@@ -190,6 +190,8 @@ When a new version is available, Home Assistant shows an update notification via
 
 The device checks for updates every 12 hours by default. On C6 the interval is configurable (1–72 hours) in the System tab of the web UI. Trigger a manual check from the Z2M OTA section or the web UI.
 
+**Manual upload (C6 only)**: Download the `.ota` file from the [GitHub Releases page](https://github.com/ShaunPCcom/ESP32-H2-LD2450/releases), open the web UI, go to System → Manual Upload, select the file, and click "Upload & Flash". The device flashes and reboots automatically — no Z2M or network update path required.
+
 ### Hosting and Releases
 
 Firmware releases are on the [GitHub Releases page](https://github.com/ShaunPCcom/ESP32-H2-LD2450/releases). Z2M checks the OTA index automatically.
@@ -302,6 +304,7 @@ ld nvs                      # NVS health check
 ld bt off                   # LD2450 sensor Bluetooth (off by default; re-disable after sensor reset)
 ld reboot                   # Restart
 ld factory-reset            # Full factory reset
+zb-reset                    # Clear Zigbee network state only (keeps zones and config)
 ```
 
 All CLI changes are saved immediately and persist across reboots.

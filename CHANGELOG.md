@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.3.0 - 2026-04-11
+
+### Features
+- **C6 end-device mode**: ESP32-C6 builds now run as a Zigbee end device rather than a router. WiFi and Zigbee router mode share the C6 radio in a way Espressif doesn't support reliably — devices trying to join through a C6 router would fail to pair. End-device mode eliminates the problem entirely. H2 is unaffected and remains a full router.
+- **Manual OTA upload**: New "Manual Upload" section in the System tab lets you flash a `.ota` release file directly from your browser without going through Z2M or a network update.
+- **Zone coordinate inputs**: The Zones tab now shows X/Y text boxes for each vertex (in metres, matching Z2M). Editing a value applies the change immediately and stays in sync with drag-and-drop edits and Z2M attribute writes. Intended for fine-tuning after placing zones visually.
+- **Radar cartesian grid**: Metre-spaced X and Y grid lines on the radar canvas give you a spatial reference for placing and aligning zone vertices.
+- **Zigbee-only reset**: `zb-reset` CLI command and System tab button clear the Zigbee network state so you can re-pair without losing zone configs or device settings.
+
+### Fixes
+- **Web UI live view freeze**: Added a 3-second watchdog on the WebSocket client. A half-open TCP connection would leave the radar frozen indefinitely — the only recovery was a device restart. The watchdog detects silence and reconnects automatically.
+- **Z2M EP1 config read**: Attribute reads batched to avoid INSUFFICIENT_SPACE errors on reconfigure.
+
+---
+
 ## v2.2.5 - 2026-04-04
 
 ### Fixes
