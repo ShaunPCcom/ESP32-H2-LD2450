@@ -12,7 +12,7 @@ set(MAIN_SRCS
 
 if("${IDF_TARGET}" STREQUAL "esp32c6")
     list(APPEND MAIN_SRCS "wifi_manager.c" "web_server.c" "ota_check.c")
-    set(C6_PRIV_REQUIRES esp_wifi esp_netif esp_event esp_http_server espressif__mdns spiffs esp_http_client mbedtls)
+    set(C6_PRIV_REQUIRES esp_wifi esp_netif esp_event esp_http_server espressif__mdns esp_http_client mbedtls)
 else()
     set(C6_PRIV_REQUIRES "")
 endif()
@@ -34,5 +34,9 @@ idf_component_register(
 )
 
 if("${IDF_TARGET}" STREQUAL "esp32c6")
-    spiffs_create_partition_image(www ../web FLASH_IN_PROJECT)
+    # Web assets embedded directly in the firmware binary so OTA updates carry
+    # the latest UI. The www SPIFFS partition is no longer mounted or used.
+    target_add_binary_data(${COMPONENT_LIB} "../web/index.html" TEXT)
+    target_add_binary_data(${COMPONENT_LIB} "../web/app.js"     TEXT)
+    target_add_binary_data(${COMPONENT_LIB} "../web/style.css"  TEXT)
 endif()

@@ -9,7 +9,6 @@
 #include "cJSON.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
-#include "esp_spiffs.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
@@ -140,98 +139,34 @@ static const char SETUP_HTML[] =
     "</script>"
     "</body></html>";
 
-/* Operational mode status page — served when WiFi STA credentials are present */
-static const char OPERATIONAL_HTML[] =
-    "<!DOCTYPE html>"
-    "<html><head><meta charset=\"utf-8\">"
-    "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-    "<title>LD2450</title>"
-    "<style>"
-    "body{font-family:sans-serif;max-width:480px;margin:40px auto;padding:0 16px;color:#333}"
-    "h1{margin-bottom:4px}"
-    "table{width:100%;border-collapse:collapse;margin-top:16px}"
-    "td{padding:8px 4px;border-bottom:1px solid #eee;font-size:.9em}"
-    "td:first-child{font-weight:600;width:45%}"
-    "button{margin-top:24px;padding:12px;background:#dc3545;color:#fff;"
-    "border:none;border-radius:6px;font-size:1em;cursor:pointer;width:100%}"
-    "button:active{background:#b02a37}"
-    ".msg{padding:10px;border-radius:4px;margin-top:16px;display:none}"
-    ".ok{background:#d4edda;color:#155724}"
-    "</style></head><body>"
-    "<h1>LD2450 Status</h1>"
-    "<table id=\"tbl\"><tr><td colspan=\"2\">Loading...</td></tr></table>"
-    "<button onclick=\"wifiReset()\">Reconfigure WiFi</button>"
-    "<div id=\"msg\" class=\"msg\"></div>"
-    "<script>"
-    "fetch('/api/status').then(function(r){return r.json();}).then(function(d){"
-    "var rows=[['Firmware',d.firmware],['WiFi',d.wifi],['Uptime',d.uptime_sec+'s'],"
-    "['Free heap',d.free_heap+' B']];"
-    "document.getElementById('tbl').innerHTML=rows.map(function(r){"
-    "return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>';}).join('');"
-    "}).catch(function(){});"
-    "function wifiReset(){"
-    "if(!confirm('Clear WiFi credentials and reboot to setup mode?'))return;"
-    "fetch('/api/wifi-reset',{method:'POST'})"
-    ".then(function(){"
-    "var m=document.getElementById('msg');"
-    "m.textContent='Rebooting to setup mode...';"
-    "m.className='msg ok';m.style.display='block';"
-    "}).catch(function(){alert('Request failed');});}"
-    "</script>"
-    "</body></html>";
-
 /* ================================================================== */
-/*  SPIFFS static file serving                                         */
+/*  Embedded web assets (compiled into firmware — updated via OTA)    */
 /* ================================================================== */
 
-static bool s_spiffs_ok = false;
+extern const char index_html_start[] asm("_binary_index_html_start");
+extern const char index_html_end[]   asm("_binary_index_html_end");
+extern const char app_js_start[]     asm("_binary_app_js_start");
+extern const char app_js_end[]       asm("_binary_app_js_end");
+extern const char style_css_start[]  asm("_binary_style_css_start");
+extern const char style_css_end[]    asm("_binary_style_css_end");
 
-static void mount_spiffs(void)
+static esp_err_t serve_embedded(httpd_req_t *req, const char *content_type,
+                                 const char *start, const char *end)
 {
-    esp_vfs_spiffs_conf_t conf = {
-        .base_path              = "/www",
-        .partition_label        = "www",
-        .max_files              = 6,
-        .format_if_mount_failed = false,
-    };
-    esp_err_t err = esp_vfs_spiffs_register(&conf);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "SPIFFS mount failed (%s) — using embedded fallback",
-                 esp_err_to_name(err));
-    } else {
-        s_spiffs_ok = true;
-        ESP_LOGI(TAG, "SPIFFS mounted at /www");
-    }
-}
-
-static esp_err_t serve_file(httpd_req_t *req, const char *path,
-                             const char *content_type)
-{
-    FILE *f = fopen(path, "r");
-    if (!f) {
-        httpd_resp_send_404(req);
-        return ESP_OK;
-    }
     httpd_resp_set_type(req, content_type);
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    char buf[2048];
-    size_t n;
-    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
-        if (httpd_resp_send_chunk(req, buf, (ssize_t)n) != ESP_OK) break;
-    }
-    fclose(f);
-    httpd_resp_send_chunk(req, NULL, 0);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_send(req, start, end - start);
     return ESP_OK;
 }
 
 static esp_err_t handle_app_js(httpd_req_t *req)
 {
-    return serve_file(req, "/www/app.js", "application/javascript");
+    return serve_embedded(req, "application/javascript", app_js_start, app_js_end);
 }
 
 static esp_err_t handle_style_css(httpd_req_t *req)
 {
-    return serve_file(req, "/www/style.css", "text/css");
+    return serve_embedded(req, "text/css", style_css_start, style_css_end);
 }
 
 /* ================================================================== */
@@ -462,13 +397,7 @@ static esp_err_t handle_root(httpd_req_t *req)
         httpd_resp_sendstr(req, SETUP_HTML);
         return ESP_OK;
     }
-    /* Operational mode: serve LittleFS index.html; fallback to embedded page */
-    if (s_spiffs_ok) {
-        return serve_file(req, "/www/index.html", "text/html");
-    }
-    httpd_resp_set_type(req, "text/html");
-    httpd_resp_sendstr(req, OPERATIONAL_HTML);
-    return ESP_OK;
+    return serve_embedded(req, "text/html", index_html_start, index_html_end);
 }
 
 /* ================================================================== */
@@ -976,8 +905,6 @@ static esp_err_t handle_not_found(httpd_req_t *req, httpd_err_code_t err)
 
 esp_err_t web_server_start(void)
 {
-    mount_spiffs();
-
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.lru_purge_enable  = true;
     cfg.stack_size        = 8192;  /* JSON serialization needs headroom */
