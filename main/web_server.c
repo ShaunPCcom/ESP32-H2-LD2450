@@ -9,7 +9,9 @@
 #include "cJSON.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_spiffs.h"
 #include "esp_system.h"
+#include "nvs.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -140,7 +142,13 @@ static const char SETUP_HTML[] =
     "</body></html>";
 
 /* ================================================================== */
-/*  Embedded web assets (compiled into firmware — updated via OTA)    */
+/*  Web assets — embedded in firmware, synced to SPIFFS on boot       */
+/*                                                                     */
+/*  Files are compiled into the firmware binary via target_add_binary_ */
+/*  data so every OTA image carries the current UI. On first boot with */
+/*  a new firmware version, sync_web_assets() detects the mismatch     */
+/*  (via NVS version key) and overwrites the SPIFFS copies. SPIFFS is  */
+/*  then used for serving — the proven, stable path.                   */
 /* ================================================================== */
 
 extern const char index_html_start[] asm("_binary_index_html_start");
@@ -150,23 +158,107 @@ extern const char app_js_end[]       asm("_binary_app_js_end");
 extern const char style_css_start[]  asm("_binary_style_css_start");
 extern const char style_css_end[]    asm("_binary_style_css_end");
 
-static esp_err_t serve_embedded(httpd_req_t *req, const char *content_type,
-                                 const char *start, const char *end)
+static bool s_spiffs_ok = false;
+
+static void mount_spiffs(void)
 {
+    esp_vfs_spiffs_conf_t conf = {
+        .base_path              = "/www",
+        .partition_label        = "www",
+        .max_files              = 6,
+        .format_if_mount_failed = true,   /* fresh device: format empty partition */
+    };
+    esp_err_t err = esp_vfs_spiffs_register(&conf);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "SPIFFS mount failed: %s", esp_err_to_name(err));
+    } else {
+        s_spiffs_ok = true;
+    }
+}
+
+/* Copy embedded web files to SPIFFS when the firmware version has changed.
+ * target_add_binary_data TEXT mode appends a null terminator — excluded here. */
+static void sync_web_assets(void)
+{
+    if (!s_spiffs_ok) return;
+
+    /* Check stored version against running firmware */
+    nvs_handle_t nvs = 0;
+    bool needs_update = true;
+    if (nvs_open("ld2450_cfg", NVS_READWRITE, &nvs) == ESP_OK) {
+        char stored[16] = {0};
+        size_t len = sizeof(stored);
+        if (nvs_get_str(nvs, "web_asset_ver", stored, &len) == ESP_OK &&
+            strcmp(stored, FIRMWARE_VERSION_STRING) == 0) {
+            needs_update = false;
+        }
+    }
+
+    if (!needs_update) {
+        ESP_LOGI(TAG, "Web assets current (%s)", FIRMWARE_VERSION_STRING);
+        if (nvs) nvs_close(nvs);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Updating web assets to %s", FIRMWARE_VERSION_STRING);
+
+    static const struct {
+        const char *path;
+        const char *start;
+        const char *end;
+    } files[] = {
+        { "/www/index.html", index_html_start, index_html_end },
+        { "/www/app.js",     app_js_start,     app_js_end     },
+        { "/www/style.css",  style_css_start,  style_css_end  },
+    };
+
+    bool ok = true;
+    for (int i = 0; i < 3; i++) {
+        size_t len = (size_t)(files[i].end - files[i].start);
+        if (len > 0 && files[i].start[len - 1] == '\0') len--;  /* strip TEXT null */
+        FILE *f = fopen(files[i].path, "w");
+        if (!f) { ESP_LOGE(TAG, "Cannot write %s", files[i].path); ok = false; continue; }
+        size_t written = fwrite(files[i].start, 1, len, f);
+        fclose(f);
+        if (written != len) { ESP_LOGE(TAG, "Short write %s", files[i].path); ok = false; }
+    }
+
+    if (ok && nvs) {
+        nvs_set_str(nvs, "web_asset_ver", FIRMWARE_VERSION_STRING);
+        nvs_commit(nvs);
+        ESP_LOGI(TAG, "Web assets updated");
+    }
+    if (nvs) nvs_close(nvs);
+}
+
+static esp_err_t serve_file(httpd_req_t *req, const char *path,
+                             const char *content_type)
+{
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        httpd_resp_send_404(req);
+        return ESP_OK;
+    }
     httpd_resp_set_type(req, content_type);
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    httpd_resp_send(req, start, end - start);
+    char buf[2048];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+        if (httpd_resp_send_chunk(req, buf, (ssize_t)n) != ESP_OK) break;
+    }
+    fclose(f);
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 
 static esp_err_t handle_app_js(httpd_req_t *req)
 {
-    return serve_embedded(req, "application/javascript", app_js_start, app_js_end);
+    return serve_file(req, "/www/app.js", "application/javascript");
 }
 
 static esp_err_t handle_style_css(httpd_req_t *req)
 {
-    return serve_embedded(req, "text/css", style_css_start, style_css_end);
+    return serve_file(req, "/www/style.css", "text/css");
 }
 
 /* ================================================================== */
@@ -397,7 +489,7 @@ static esp_err_t handle_root(httpd_req_t *req)
         httpd_resp_sendstr(req, SETUP_HTML);
         return ESP_OK;
     }
-    return serve_embedded(req, "text/html", index_html_start, index_html_end);
+    return serve_file(req, "/www/index.html", "text/html");
 }
 
 /* ================================================================== */
@@ -905,6 +997,9 @@ static esp_err_t handle_not_found(httpd_req_t *req, httpd_err_code_t err)
 
 esp_err_t web_server_start(void)
 {
+    mount_spiffs();
+    sync_web_assets();
+
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.lru_purge_enable  = true;
     cfg.stack_size        = 8192;  /* JSON serialization needs headroom */
