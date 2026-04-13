@@ -251,7 +251,8 @@ esp_err_t web_server_start(void)
         .device_name       = "LD2450",
         .firmware_version  = FIRMWARE_VERSION_STRING,
         .nvs_namespace     = "ld2450_cfg",
-        .ota_image_type    = 0x0003,   /* LD2450-C6 */
+        .ota_image_type      = 0x0003,   /* LD2450-C6 */
+        .current_version_hex = FIRMWARE_VERSION,
         .index_html_start  = (const uint8_t *)index_html_start,
         .index_html_size   = (size_t)(index_html_end - index_html_start),
         .app_js_start      = (const uint8_t *)app_js_start,
