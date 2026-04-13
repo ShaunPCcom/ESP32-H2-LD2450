@@ -889,12 +889,6 @@ async function saveOtaInterval() {
   }
 }
 
-async function wifiReset() {
-  if (!confirm('Clear WiFi credentials and reboot to setup mode?')) return;
-  await fetch('/api/wifi-reset', { method: 'POST' });
-  toast('REBOOTING…', 'ok');
-}
-
 async function doRestart() {
   if (!confirm('Restart the device?')) return;
   await fetch('/api/restart', { method: 'POST' });

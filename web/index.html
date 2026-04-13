@@ -166,8 +166,31 @@
           <div class="stat-row"><span class="stat-k">Hostname</span><span class="stat-v" id="wf-host">—</span></div>
           <div class="stat-row"><span class="stat-k">WiFi</span><span class="stat-v" id="wf-state">—</span></div>
         </div>
-        <br>
-        <button class="btn danger" onclick="wifiReset()">↺ Reconfigure WiFi</button>
+        <div class="sec">Network</div>
+        <div class="field">
+          <div class="flabel">Network</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <select id="wifi-net-select" onchange="wfOnChange()" style="flex:1"></select>
+            <button class="btn" onclick="wfScan()">↻</button>
+          </div>
+          <div id="wifi-manual-row" style="display:none;margin-bottom:8px">
+            <input id="wifi-manual-ssid" type="text" class="text-input" placeholder="Enter SSID"
+              autocomplete="off" spellcheck="false" style="width:100%">
+          </div>
+          <div id="wifi-password-row" style="margin-bottom:8px">
+            <div class="flabel">Password</div>
+            <input id="wifi-password" type="password" class="text-input"
+              placeholder="Leave blank for open networks" autocomplete="current-password" style="width:100%">
+          </div>
+          <div id="wifi-hostname-row" style="margin-bottom:8px">
+            <div class="flabel">Hostname</div>
+            <input id="wifi-hostname" type="text" class="text-input" placeholder="e.g. ld2450"
+              autocomplete="off" spellcheck="false" style="width:100%">
+          </div>
+        </div>
+        <button class="btn primary" id="wifi-action-btn"
+          data-connect-class="btn primary" data-reset-class="btn danger"
+          onclick="wfAction()">✓ Connect</button>
       </div>
 
       <!-- SYSTEM -->
@@ -222,6 +245,7 @@
 </div><!-- /layout -->
 
 <div id="toast"></div>
+<script src="/wifi.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>
