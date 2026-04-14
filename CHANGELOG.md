@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.4.0 - 2026-04-14
+
+### Features
+- **WiFi scan-and-connect**: The web UI WiFi tab now scans for nearby networks and
+  lets you select one from a list rather than typing the SSID manually.
+
+### Fixes
+- **C6 rejoins Z2M after power cycle**: After switching to end-device mode in v2.3.0,
+  C6 units were silent on reboot — Z2M had no way to know the device was back and
+  the device would only appear after a force-remove and re-pair. C6 now broadcasts
+  a ZDO Device_annce on startup to restore the visibility that router mode
+  provided automatically.
+- **Reduced occupancy report interval**: Occupancy attribute reporting is now more
+  responsive under quiet conditions.
+
+---
+
 ## v2.3.2 - 2026-04-12
 
 ### Fixes
