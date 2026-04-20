@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LD2450</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+  <div class="logo">LD2450<em>·ZB</em></div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-host" id="hdr-host"></div>
+  <div class="ws-pill">
+    <div class="ws-dot" id="ws-dot"></div>
+    <span id="ws-label">offline</span>
+  </div>
+</header>
+
+<div class="update-bar" id="update-bar" onclick="goToSystem()">
+  ↑ FIRMWARE UPDATE AVAILABLE — CLICK TO UPDATE
+</div>
+
+<div class="layout">
+
+  <!-- Radar -->
+  <div class="radar-wrap">
+    <canvas id="cv"></canvas>
+    <div class="r-info">
+      <div class="r-info-row"><b>RANGE</b><span id="ov-range">—</span></div>
+      <div class="r-info-row"><b>TGTS</b><span id="ov-tgts">0</span></div>
+      <div class="r-info-row"><b>ZONES</b><span id="ov-zones">0/10</span></div>
+    </div>
+    <div class="edit-banner" id="edit-banner">ZONE EDIT MODE</div>
+    <div class="r-badge" id="r-badge">VACANT</div>
+  </div>
+
+  <!-- Settings -->
+  <div class="settings">
+    <nav class="tabs">
+      <button class="tab on" data-tab="sensor">Sensor</button>
+      <button class="tab" data-tab="occupancy">Occupancy</button>
+      <button class="tab" data-tab="zones">Zones</button>
+      <button class="tab" data-tab="fallback">Fallback</button>
+      <button class="tab" data-tab="wifi">WiFi</button>
+      <button class="tab" data-tab="system">System</button>
+    </nav>
+
+    <div class="tab-body">
+
+      <!-- SENSOR -->
+      <div class="pane on" id="pane-sensor">
+        <div class="sec">Detection Range</div>
+        <div class="field">
+          <div class="flabel">Max Distance <span class="fval" id="v-max_distance_mm">—</span></div>
+          <input type="range" min="500" max="6000" step="100"
+            data-key="max_distance_mm" data-unit="mm">
+        </div>
+
+        <div class="sec">Field of View</div>
+        <div class="field">
+          <div class="flabel">Left Angle <span class="fval" id="v-angle_left_deg">—</span></div>
+          <input type="range" min="0" max="60" step="1"
+            data-key="angle_left_deg" data-unit="°">
+        </div>
+        <div class="field">
+          <div class="flabel">Right Angle <span class="fval" id="v-angle_right_deg">—</span></div>
+          <input type="range" min="0" max="60" step="1"
+            data-key="angle_right_deg" data-unit="°">
+        </div>
+
+        <div class="sec">Mode</div>
+        <div class="tog-row">
+          <span class="tog-lbl">Multi-Target Tracking</span>
+          <label class="tog">
+            <input type="checkbox" data-key="tracking_mode" data-invert>
+            <div class="tog-track"></div><div class="tog-thumb"></div>
+          </label>
+        </div>
+        <div class="tog-row">
+          <span class="tog-lbl">Publish Coordinates</span>
+          <label class="tog">
+            <input type="checkbox" data-key="publish_coords">
+            <div class="tog-track"></div><div class="tog-thumb"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- OCCUPANCY -->
+      <div class="pane" id="pane-occupancy">
+        <div class="sec">Global Timing</div>
+        <div class="field">
+          <div class="flabel">Clear Cooldown <span class="fval" id="v-occupancy_cooldown_sec">—</span></div>
+          <input type="range" min="0" max="30" step="1"
+            data-key="occupancy_cooldown_sec" data-unit="s">
+        </div>
+        <div class="field">
+          <div class="flabel">Entry Delay <span class="fval" id="v-occupancy_delay_ms">—</span></div>
+          <input type="range" min="0" max="2000" step="50"
+            data-key="occupancy_delay_ms" data-unit="ms">
+        </div>
+      </div>
+
+      <!-- ZONES -->
+      <div class="pane" id="pane-zones">
+        <div class="zone-grid" id="zone-grid"></div>
+        <div id="zone-detail"></div>
+      </div>
+
+      <!-- FALLBACK -->
+      <div class="pane" id="pane-fallback">
+        <div class="sec">Coordinator Fallback</div>
+        <div class="field">
+          <div class="flabel">Mode</div>
+          <select data-key="fallback_mode">
+            <option value="0">Disabled</option>
+            <option value="1">Soft — per-zone assist</option>
+            <option value="2">Hard — full autonomy</option>
+          </select>
+        </div>
+        <div class="tog-row">
+          <span class="tog-lbl">Fallback Active</span>
+          <label class="tog">
+            <input type="checkbox" data-key="fallback_enable">
+            <div class="tog-track"></div><div class="tog-thumb"></div>
+          </label>
+        </div>
+
+        <div class="sec">Timeouts</div>
+        <div class="field">
+          <div class="flabel">Hard Timeout <span class="fval" id="v-hard_timeout_sec">—</span></div>
+          <input type="range" min="5" max="300" step="5"
+            data-key="hard_timeout_sec" data-unit="s">
+        </div>
+        <div class="field">
+          <div class="flabel">Ack Timeout <span class="fval" id="v-ack_timeout_ms">—</span></div>
+          <input type="range" min="500" max="30000" step="500"
+            data-key="ack_timeout_ms" data-unit="ms">
+        </div>
+        <div class="field">
+          <div class="flabel">Fallback Cooldown <span class="fval" id="v-fallback_cooldown_sec">—</span></div>
+          <input type="range" min="0" max="120" step="5"
+            data-key="fallback_cooldown_sec" data-unit="s">
+        </div>
+
+        <div class="sec">Heartbeat Watchdog</div>
+        <div class="tog-row">
+          <span class="tog-lbl">Enable Heartbeat</span>
+          <label class="tog">
+            <input type="checkbox" data-key="heartbeat_enable">
+            <div class="tog-track"></div><div class="tog-thumb"></div>
+          </label>
+        </div>
+        <div class="field">
+          <div class="flabel">Heartbeat Interval <span class="fval" id="v-heartbeat_interval_sec">—</span></div>
+          <input type="range" min="10" max="300" step="10"
+            data-key="heartbeat_interval_sec" data-unit="s">
+        </div>
+      </div>
+
+      <!-- WIFI -->
+      <div class="pane" id="pane-wifi">
+        <div class="sec">Connection</div>
+        <div class="stat-grid">
+          <div class="stat-row"><span class="stat-k">Hostname</span><span class="stat-v" id="wf-host">—</span></div>
+          <div class="stat-row"><span class="stat-k">WiFi</span><span class="stat-v" id="wf-state">—</span></div>
+        </div>
+        <div class="sec">Network</div>
+        <div class="field">
+          <div class="flabel">Network</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <select id="wifi-net-select" onchange="wfOnChange()" style="flex:1"></select>
+            <button class="btn" onclick="wfScan()">↻</button>
+          </div>
+          <div id="wifi-manual-row" style="display:none;margin-bottom:8px">
+            <input id="wifi-manual-ssid" type="text" class="text-input" placeholder="Enter SSID"
+              autocomplete="off" spellcheck="false" style="width:100%">
+          </div>
+          <div id="wifi-password-row" style="margin-bottom:8px">
+            <div class="flabel">Password</div>
+            <input id="wifi-password" type="password" class="text-input"
+              placeholder="Leave blank for open networks" autocomplete="current-password" style="width:100%">
+          </div>
+          <div id="wifi-hostname-row" style="margin-bottom:8px">
+            <div class="flabel">Hostname</div>
+            <input id="wifi-hostname" type="text" class="text-input" placeholder="e.g. ld2450"
+              autocomplete="off" spellcheck="false" style="width:100%">
+          </div>
+        </div>
+        <button class="btn primary" id="wifi-action-btn"
+          data-connect-class="btn primary" data-reset-class="btn danger"
+          onclick="wfAction()">✓ Connect</button>
+      </div>
+
+      <!-- SYSTEM -->
+      <div class="pane" id="pane-system">
+        <div class="sec">Device</div>
+        <div class="stat-grid">
+          <div class="stat-row"><span class="stat-k">Firmware</span><span class="stat-v" id="sy-fw">—</span></div>
+          <div class="stat-row"><span class="stat-k">Uptime</span><span class="stat-v" id="sy-up">—</span></div>
+          <div class="stat-row"><span class="stat-k">Free Heap</span><span class="stat-v" id="sy-heap">—</span></div>
+        </div>
+        <br>
+        <button class="btn" onclick="doRestart()">↺ Restart Device</button>
+        <button class="btn" onclick="doZbReset()">⟳ Zigbee Reset</button>
+        <button class="btn danger" onclick="doFactoryReset()">✕ Factory Reset</button>
+
+        <div class="sec">Firmware Update</div>
+        <div class="stat-grid">
+          <div class="stat-row">
+            <span class="stat-k">Status</span>
+            <span class="stat-v" id="sy-ota-status">—</span>
+          </div>
+        </div>
+        <br>
+        <button class="btn" id="btn-ota-check" onclick="doOtaCheck()">↻ Check for Updates</button>
+        <button class="btn primary" id="btn-ota-update" onclick="doOtaUpdate()" disabled>↑ Update Firmware</button>
+
+        <div class="sec">Manual Upload</div>
+        <div class="field">
+          <input type="file" id="inp-ota-file" accept=".ota" class="text-input">
+        </div>
+        <button class="btn" onclick="doOtaFileUpload()">↑ Upload &amp; Flash</button>
+
+        <div class="sec">Update Check</div>
+        <div class="field">
+          <div class="flabel">Check Interval <span class="fval" id="sy-ota-interval-v">—</span></div>
+          <input type="range" id="sl-ota-interval" min="1" max="72" step="1" value="12">
+        </div>
+        <button class="btn" onclick="saveOtaInterval()">Save Interval</button>
+
+        <div class="sec">OTA Index URL</div>
+        <div class="field">
+          <input type="text" id="inp-ota-url" class="text-input"
+            placeholder="https://…/ota_index.json" spellcheck="false" autocomplete="off">
+        </div>
+        <button class="btn" onclick="saveOtaIndexUrl()">Save URL</button>
+        <button class="btn" onclick="resetOtaIndexUrl()">Reset to Default</button>
+      </div>
+
+    </div><!-- /tab-body -->
+  </div><!-- /settings -->
+
+</div><!-- /layout -->
+
+<div id="toast"></div>
+<script src="/wifi.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

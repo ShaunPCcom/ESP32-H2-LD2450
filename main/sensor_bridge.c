@@ -15,6 +15,7 @@
 /* Project */
 #include "coordinator_fallback.h"
 #include "ld2450.h"
+#include "ld2450_zone_csv.h"
 #include "nvs_config.h"
 #include "sensor_bridge.h"
 #include "zigbee_defs.h"
@@ -22,6 +23,9 @@
 #include "crash_diag.h"
 
 static const char *TAG = "sensor_bridge";
+
+/* Set by sensor_bridge_mark_config_dirty(); cleared after push_config_attrs() */
+static volatile bool s_config_dirty = false;
 
 /* Sensor poll interval (ms) - LD2450 outputs at 10Hz (100ms) */
 #define SENSOR_POLL_INTERVAL_MS  100
@@ -96,12 +100,86 @@ static void format_coords_string(const ld2450_state_t *state, char *buf, size_t 
     }
 }
 
+/* Push all writable config attributes into the ZCL attribute table.
+ * Called from sensor_poll_cb (Zigbee task context) when s_config_dirty is set. */
+static void push_config_attrs(void)
+{
+    nvs_config_t cfg;
+    nvs_config_get(&cfg);
+
+#define SET_ATTR(ep, cluster, attr, val) \
+    esp_zb_zcl_set_attribute_val((ep), (cluster), \
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, (attr), (val), false)
+
+    /* ---- Sensor config ---- */
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_MAX_DISTANCE,      &cfg.max_distance_mm);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_ANGLE_LEFT,        &cfg.angle_left_deg);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_ANGLE_RIGHT,       &cfg.angle_right_deg);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_TRACKING_MODE,     &cfg.tracking_mode);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_COORD_PUBLISHING,  &cfg.publish_coords);
+
+    /* ---- Main EP occupancy timing ---- */
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_OCCUPANCY_COOLDOWN, &cfg.occupancy_cooldown_sec[0]);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_OCCUPANCY_DELAY,    &cfg.occupancy_delay_ms[0]);
+
+    /* ---- Coordinator fallback ---- */
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_FALLBACK_MODE,      &cfg.fallback_mode);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_FALLBACK_ENABLE,    &cfg.fallback_enable);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_FALLBACK_COOLDOWN,  &cfg.fallback_cooldown_sec[0]);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_HARD_TIMEOUT_SEC,   &cfg.hard_timeout_sec);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_ACK_TIMEOUT_MS,     &cfg.ack_timeout_ms);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_HEARTBEAT_ENABLE,   &cfg.heartbeat_enable);
+    SET_ATTR(ZB_EP_MAIN, ZB_CLUSTER_LD2450_CONFIG, ZB_ATTR_HEARTBEAT_INTERVAL, &cfg.heartbeat_interval_sec);
+
+    /* ---- Zone config (each zone on its own EP) ---- */
+    /* With each zone on its own cluster instance, ZBoss handles CHAR_STRING reports
+     * independently per zone — no more "only first zone fires" reporting bug. */
+    char zb_str[ZB_ZONE_COORDS_MAX_LEN + 2];
+    char csv[ZB_ZONE_COORDS_MAX_LEN];
+
+    for (int n = 0; n < ZB_EP_ZONE_COUNT; n++) {
+        uint8_t ep = ZB_EP_ZONE(n);
+        SET_ATTR(ep, ZB_CLUSTER_LD2450_CONFIG,
+                 ZB_ATTR_ZONE_VERTEX_COUNT(n), &cfg.zones[n].vertex_count);
+
+        SET_ATTR(ep, ZB_CLUSTER_LD2450_CONFIG,
+                 ZB_ATTR_ZONE_COOLDOWN(n), &cfg.occupancy_cooldown_sec[n + 1]);
+
+        SET_ATTR(ep, ZB_CLUSTER_LD2450_CONFIG,
+                 ZB_ATTR_ZONE_DELAY(n), &cfg.occupancy_delay_ms[n + 1]);
+
+        /* Coords: ZCL CHAR_STRING = length byte + CSV payload.
+         * false flag: ZBoss copies value into its own attr storage — local buffer safe. */
+        zone_to_csv(&cfg.zones[n], csv, sizeof(csv));
+        size_t len = strlen(csv);
+        zb_str[0] = (char)len;
+        memcpy(zb_str + 1, csv, len + 1);
+        SET_ATTR(ep, ZB_CLUSTER_LD2450_CONFIG,
+                 ZB_ATTR_ZONE_COORDS(n), zb_str);
+    }
+
+#undef SET_ATTR
+
+    ESP_LOGD(TAG, "Config attrs pushed to ZCL table");
+}
+
+void sensor_bridge_mark_config_dirty(void)
+{
+    s_config_dirty = true;
+}
+
 static void sensor_poll_cb(uint8_t param)
 {
     (void)param;
     esp_zb_scheduler_alarm(sensor_poll_cb, ALARM_PARAM_POLL, SENSOR_POLL_INTERVAL_MS);
 
     if (!zigbee_is_network_joined()) return;
+
+    /* Push all config attrs when dirtied by an external source (e.g. web UI) */
+    if (s_config_dirty) {
+        s_config_dirty = false;
+        push_config_attrs();
+    }
 
     /* Update RTC uptime every poll — pure memory write, no Zigbee traffic */
     crash_diag_update_uptime((uint32_t)(esp_timer_get_time() / 1000000ULL));
@@ -335,9 +413,15 @@ static void configure_all_reporting(void)
     configure_reporting_for_diag_attr(ZB_ATTR_LAST_UPTIME_SEC, REPORT_MAX_INTERVAL);
     /* Min free heap: no keepalive, reported only alongside occupancy/sensor changes */
     configure_reporting_for_diag_attr(ZB_ATTR_MIN_FREE_HEAP,   0);
-    /* Fallback mode (hard) and soft fault: report on any change (delta=0) */
-    configure_reporting_for_diag_attr(ZB_ATTR_FALLBACK_MODE,   0);
+    /* Soft fault: report on any change (delta=0) */
     configure_reporting_for_diag_attr(ZB_ATTR_SOFT_FAULT,      0);
+
+    /* Zone config attrs: no device-side entries needed.
+     * Each zone EP has its own cluster instance with only 4 attrs, so Z2M's
+     * configureReporting entries work correctly without device-side overrides.
+     * Device-side entries would double the reporting table size and exceed
+     * ZBoss's default allocation. */
+
     ESP_LOGI(TAG, "Reporting configured for all endpoints");
 }
 
@@ -352,5 +436,8 @@ void sensor_bridge_start(void)
 
     ESP_LOGI(TAG, "Starting sensor bridge (poll every %d ms)", SENSOR_POLL_INTERVAL_MS);
     configure_all_reporting();
+    /* Push real config values on first poll — corrects the max-length padded
+     * placeholder used to pre-allocate ZBoss's internal CHAR_STRING buffers. */
+    s_config_dirty = true;
     esp_zb_scheduler_alarm(sensor_poll_cb, ALARM_PARAM_POLL, SENSOR_POLL_INTERVAL_MS);
 }

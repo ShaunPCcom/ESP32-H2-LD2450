@@ -1,0 +1,40 @@
+#
+# ESP32-C6 specific defaults
+#
+
+#
+# Partition Table
+#
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_c6.csv"
+
+#
+# Flash Size (16MB on nanoESP32-C6)
+#
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+#
+# WiFi (C6 only - needed for web configuration UI)
+#
+CONFIG_ESP_WIFI_ENABLED=y
+
+#
+# HTTP server WebSocket support (for /ws/targets target stream)
+#
+CONFIG_HTTPD_WS_SUPPORT=y
+
+#
+# WiFi + Zigbee coexistence
+#
+CONFIG_ESP_COEX_ENABLED=y
+CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
+
+#
+# Zigbee role: End Device (router mode is unstable with WiFi coexistence on C6)
+#
+CONFIG_LD2450_ZB_ROUTER=n
+
+#
+# Flash chip support (nanoESP32-C6 uses Boya flash)
+#
+CONFIG_SPI_FLASH_SUPPORT_BOYA_CHIP=y

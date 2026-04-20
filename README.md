@@ -6,22 +6,24 @@
 
 A Zigbee presence sensor built on the ESP32-H2 and HLK-LD2450 24GHz mmWave radar. It tracks up to 3 people simultaneously, reports their positions, and lets you define **10 custom polygon zones** for room-level presence detection — all integrated into Home Assistant via Zigbee2MQTT.
 
-This is a native Zigbee alternative to ESPHome-based LD2450 implementations. No WiFi needed, no cloud, just mesh networking that works with any Zigbee coordinator.
+This is a native Zigbee alternative to ESPHome-based LD2450 implementations. ESP32-H2 requires no WiFi, no cloud — just mesh networking that works with any Zigbee coordinator.
 
 **Based on**: [TillFleisch/ESPHome-HLK-LD2450](https://github.com/TillFleisch/ESPHome-HLK-LD2450) — UART protocol implementation derived from this ESPHome component (MIT License). Reimplemented in C for ESP-IDF with Zigbee support and multi-zone architecture.
 
 ## Features
 
-- **3-target tracking** — real-time X/Y coordinates (mm) for up to 3 people
-- **10 configurable zones** — custom polygon areas with 3–10 vertices each (e.g., "couch", "desk", "bed")
-- **Zigbee2MQTT integration** — 89 Home Assistant entities via external converter
-- **OTA firmware updates** — remote updates via Zigbee2MQTT with automatic rollback if an update fails
-- **Coordinator fallback** — keeps lights working during coordinator or HA outages using direct Zigbee bindings and a heartbeat watchdog ([setup guide](docs/coordinator-fallback.md))
-- **All settings persist** — configuration survives reboots, even without a coordinator connection
-- **Crash diagnostics** — boot count, reset reason, uptime, and heap sensors for remote debugging
-- **Serial CLI** — configure everything over USB without needing a network connection
-- **LED status** — WS2812 RGB LED shows connection state at a glance
-- **Two-level factory reset** — 3 s hold resets Zigbee network (keeps config), 10 s hold wipes everything
+- **3-target tracking** — simultaneous X/Y positions for up to 3 people in real time
+- **Polygon zones** — up to 10 arbitrary areas (3–10 vertices each); all zone logic runs on-device with independent occupancy, cooldown, and delay settings
+- **Independent zone reporting** — each zone reports changes individually with no batching or polling delays
+- **Low Zigbee chatter** — log-on-change reporting; coordinate publishing can be disabled for minimal traffic
+- **Z2M integration** — rich Home Assistant entity model via external converter
+- **OTA updates** — remote firmware updates via Z2M with automatic rollback on failure; C6 uses Wi-Fi transport when available for faster updates, includes a web UI with one-click update trigger and configurable background check interval, and supports manual `.ota` file upload directly from the browser
+- **Coordinator fallback** — maintains light control if Z2M or HA goes down; direct Zigbee bindings and a heartbeat watchdog preserve occupancy behavior ([setup guide](docs/coordinator-fallback.md))
+- **Config persists** — all settings survive reboots without requiring a coordinator connection
+- **Crash diagnostics** — boot count, reset reason, uptime, and heap tracked for remote debugging
+- **Serial CLI** — full configuration over USB, no network required
+- **LED status** — RGB LED shows connection state at a glance
+- **Two-level factory reset** — 3 s hold clears Zigbee network (keeps config), 10 s hold wipes everything
 
 ## Zigbee vs ESPHome
 
@@ -29,40 +31,38 @@ This Zigbee implementation offers different trade-offs compared to ESPHome-based
 
 ### Advantages of Zigbee
 
-- **Native Zigbee** — no WiFi configuration, works with any Zigbee coordinator
-- **Mesh networking** — router-capable, extends your Zigbee network range
-- **OTA updates** — remote firmware updates via Zigbee2MQTT with automatic rollback
-- **Settings persist independently** — config is stored on the device, not in the coordinator
-- **Multi-endpoint architecture** — 11 Zigbee endpoints for cleaner HA organization
-- **Two-level factory reset** — separate Zigbee vs full config reset
-- **Serial CLI** — direct UART configuration without network dependency
-- **10 configurable zones** — more than typical ESPHome examples (which show 1 zone)
-- **Flexible polygons** — 3–10 vertices per zone (triangles, rectangles, irregular shapes)
+- **Native Zigbee** — no WiFi required on H2, works with any Zigbee coordinator
+- **Mesh networking** — H2 is a full Zigbee router and extends your mesh; C6 runs as an end device (WiFi+router coexistence is unsupported on the C6 radio)
+- **Device-local config** — all settings stored on-device, not in the coordinator
+- **Multi-endpoint architecture** — multiple endpoints for cleaner HA organization
+- **Arbitrary polygon zones** — up to 10 configurable areas (3–10 vertices each)
 
 ### Advantages of ESPHome
 
 - **Unlimited zones** — component supports unlimited zones (vs fixed 10)
 - **Rich per-target data** — individual speed, distance, angle sensors per target
 - **Dynamic zone updates** — runtime polygon updates via actions
-- **Web interface** — ESPHome web UI for configuration
-- **WiFi diagnostics** — built-in web-based tools
+- **Web-based configuration** — ESPHome uses Home Assistant or its builder interface; the C6 target provides a fully on-device UI with real-time zone editing
+- **WiFi network tooling** — built-in diagnostics for connectivity and debugging
 
 ### Equivalent Features
 
 Both versions support: occupancy detection (overall + per-zone), target count, max distance/angle limits, tracking mode (single/multi), coordinate publishing, and remote restart.
 
-**Choose Zigbee if**: you want native mesh networking, simpler setup, or network-independent config.
-**Choose ESPHome if**: you need unlimited zones, per-target sensors, or prefer WiFi/web management.
+**Choose Zigbee if**: you want native mesh networking, device-local logic, and minimal runtime dependency on WiFi or Home Assistant.
+**Choose ESPHome if**: you need unlimited zones, per-target sensors, or prefer Home Assistant-centric configuration.
 
 ## Hardware
 
-### Requirements
+### ESP32-H2 (LD2450-H2)
+
+**Requirements**
 
 - **ESP32-H2 DevKit** (native 802.15.4 Zigbee radio)
 - **HLK-LD2450** 24GHz mmWave radar module
 - 5V power supply (USB or mains adapter)
 
-### Wiring
+**Wiring**
 
 | ESP32-H2 Pin | LD2450 Pin | Function |
 |--------------|------------|----------|
@@ -73,34 +73,64 @@ Both versions support: occupancy detection (overall + per-zone), target count, m
 | 5V           | 5V         | Power |
 | GND          | GND        | Ground |
 
-**Notes**:
+---
+
+### ESP32-C6 (LD2450-C6)
+
+**Requirements**
+
+- **nanoESP32-C6 v1.0** (validated board; Zigbee 802.15.4 + WiFi)
+- **HLK-LD2450** 24GHz mmWave radar module
+- 5V power supply (USB or mains adapter)
+- WiFi network (required — Zigbee and WiFi share the radio; the device must connect in STA mode before Zigbee starts)
+
+**Wiring**
+
+| ESP32-C6 Pin | LD2450 Pin | Function |
+|--------------|------------|----------|
+| GPIO10       | RX         | ESP32 TX → LD2450 RX (commands) |
+| GPIO11       | TX         | ESP32 RX ← LD2450 TX (data) |
+| GPIO8        | —          | Status LED (built-in WS2812 on nanoESP32-C6) |
+| GPIO9        | —          | BOOT button (factory reset) |
+| 5V           | 5V         | Power |
+| GND          | GND        | Ground |
+
+---
+
+**Notes** (both targets):
 - UART baud rate: 256000
-- GPIO9 is the BOOT button (active-low, internal pull-up)
-- **GPIO8 Status LED**: Most ESP32-H2 boards (like the DevKitM-1) have a built-in addressable RGB LED (WS2812) on GPIO8. This is the programmable status LED — not the red power LED that stays on when the board is plugged in.
+- GPIO9 is active-low with an internal pull-up (BOOT / factory reset)
+- GPIO8 is the addressable RGB LED (WS2812) — not the red power LED
+- UART pins differ between H2 and C6 targets; ensure correct wiring for your build
 
 ## Building
 
 ### Prerequisites
 
-- **ESP-IDF v5.5+** ([installation guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32h2/get-started/))
+- ESP-IDF v5.5+
 - Git
-
-### Build and Flash
 
 ```bash
 git clone <repository-url>
 cd ld2450_zb_h2
 
-# Set up ESP-IDF environment (once per terminal session)
+# Set up ESP-IDF environment
 . $HOME/esp/esp-idf/export.sh
 
-# Build and flash
+# ESP32-H2
 idf.py set-target esp32h2
+idf.py build
+idf.py -p /dev/ttyUSB0 flash monitor
+
+# ESP32-C6
+idf.py set-target esp32c6
 idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-**Note**: `idf.py monitor` triggers a reboot on ESP32-H2 due to DTR/RTS reset. Use `idf.py monitor --no-reset` to attach without rebooting.
+**Note**: `idf.py monitor` may trigger a reboot due to DTR/RTS reset. Use `idf.py monitor --no-reset` to attach without rebooting.
+
+**Note (ESP32-C6)**: After flashing, the device starts in AP mode for WiFi setup via the web UI. WiFi must be connected before Zigbee starts.
 
 ## Zigbee2MQTT Setup
 
@@ -108,13 +138,14 @@ idf.py -p /dev/ttyUSB0 flash monitor
    ```bash
    cp z2m/ld2450_zb_h2.js /path/to/zigbee2mqtt/data/external_converters/
    ```
+   **Note**: The external converter file name remains `ld2450_zb_h2.js` for compatibility, but it supports both ESP32-H2 and ESP32-C6 targets.
 
 2. **Restart Zigbee2MQTT**
 
 3. **Pair the device**:
    - Make sure the device isn't already paired (LED shows amber blink)
    - In Z2M, click "Permit join (All)"
-   - Power cycle the ESP32-H2 or press reset
+   - Power cycle the device or press reset
    - Device auto-pairs and appears in Z2M
 
 4. **Reconfigure** (if entities are missing):
@@ -123,11 +154,13 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 ## Firmware Updates (OTA)
 
-Updates are delivered wirelessly through the Zigbee network with automatic rollback protection. If a new firmware fails to boot, the device automatically reverts to the previous working version.
+Updates are delivered over Zigbee OTA with automatic rollback protection. If a new firmware fails to boot, the device automatically reverts to the previous working version.
+
+**Note**: ESP32-H2 and ESP32-C6 use separate firmware images. Ensure you install updates corresponding to your hardware target.
 
 ### Getting Notified
 
-When a new version is available, Home Assistant shows an update notification via the `update.ld2450_update` entity — just like officially supported devices. Updates are never installed automatically.
+When a new version is available, Home Assistant shows an update notification via the device's firmware update entity — just like officially supported devices. Updates are never installed automatically.
 
 ### Installing
 
@@ -138,18 +171,28 @@ When a new version is available, Home Assistant shows an update notification via
 4. Device reboots automatically after a successful update
 
 **Via Zigbee2MQTT UI:**
-1. Select the device → go to the "About" tab
+1. Select the device → go to the OTA section
 2. Click "Update to latest firmware"
 3. Watch the progress bar
 
 ### How It Works
 
+**ESP32-H2:**
 1. **Download**: Firmware transfers over Zigbee in 64-byte blocks (~2–5 minutes)
 2. **Validation**: Device verifies the image before applying
 3. **Reboot**: Device boots into the new firmware
 4. **Rollback**: If the new firmware fails, the bootloader reverts automatically
 
-The device checks for updates every 24 hours. Trigger a manual check from the Z2M "About" tab.
+**ESP32-C6** (when Wi-Fi is connected):
+1. **Download**: Firmware downloads over HTTPS in seconds rather than minutes
+2. **Validation** and **Reboot** same as H2
+3. Falls back to Zigbee transport automatically if Wi-Fi is unavailable
+
+The device checks for updates every 12 hours by default. On C6 the interval is configurable (1–72 hours) in the System tab of the web UI. Trigger a manual check from the Z2M OTA section or the web UI.
+
+> **C6 OTA channel note**: When Z2M triggers an update on the C6, the Zigbee notification is used only as a signal — the Zigbee OTA protocol does not carry a download URL, so the device has no way to know what image Z2M intended to send. The C6 always fetches from its own internal OTA index URL (configurable in System → OTA Index URL). If Z2M is pointed at a beta OTA index but the device's internal URL points to stable, the device will download the latest stable release — not the beta Z2M advertised, and vice versa. To keep them in sync, set the device's OTA index URL to match whatever channel Z2M is using. Manual upload bypasses this entirely.
+
+**Manual upload (C6 only)**: Download the `.ota` file from the [GitHub Releases page](https://github.com/ShaunPCcom/ESP32-H2-LD2450/releases), open the web UI, go to System → Manual Upload, select the file, and click "Upload & Flash". The device flashes and reboots automatically — no Z2M or network update path required.
 
 ### Hosting and Releases
 
@@ -157,9 +200,13 @@ Firmware releases are on the [GitHub Releases page](https://github.com/ShaunPCco
 
 Releases are fully automated via GitHub Actions — tagging a new version triggers the build, creates the OTA image, publishes the release, and updates the OTA index. See `.github/RELEASE.md` for details.
 
+Each release generates separate OTA images for ESP32-H2 and ESP32-C6 targets.
+
 ## Exposed Entities
 
-All 89 entities are automatically discovered in Home Assistant via Zigbee2MQTT.
+The following entity model applies to both ESP32-H2 and ESP32-C6 when using the shared Z2M external converter.
+
+All Zigbee-exposed entities are automatically discovered in Home Assistant via Z2M.
 
 ### Sensors (Read-only)
 
@@ -187,10 +234,10 @@ All 89 entities are automatically discovered in Home Assistant via Zigbee2MQTT.
 | `occupancy_delay` | Numeric | 0–65535 ms | Delay before reporting Occupied (main sensor) |
 | `fallback_enable` | Switch | ON/OFF | Enable coordinator fallback system |
 | `fallback_mode` | Switch | ON/OFF | Hard fallback active (ON = sensor is controlling lights) |
-| `fallback_cooldown` | Numeric | 0–300 s | How long to keep light on after presence clears (main, fallback only) |
+| `fallback_cooldown` | Numeric | 0–600 s | How long to keep light on after presence clears (main, fallback only) |
 | `heartbeat_enable` | Switch | ON/OFF | Enable software watchdog for HA/Z2M crash detection |
 | `heartbeat_interval` | Numeric | 30–3600 s | Expected ping interval (watchdog fires at 2× this) |
-| `hard_timeout_sec` | Numeric | 1–60 s | Seconds after first soft fault before escalating to hard fallback |
+| `hard_timeout_sec` | Numeric | 5–120 s | Seconds after first soft fault before escalating to hard fallback |
 | `ack_timeout_ms` | Numeric | 500–10000 ms | How long to wait for coordinator ACK before soft fallback |
 
 ### Zone Configuration (5 entities per zone, 50 total)
@@ -203,27 +250,30 @@ Each of the 10 zones has:
 | `zone_N_coords` | Text | Polygon vertices as CSV in metres: `x1,y1,x2,y2,...` |
 | `zone_N_cooldown` | Numeric (0–300 s) | Delay before reporting Clear for this zone |
 | `zone_N_delay` | Numeric (0–65535 ms) | Delay before reporting Occupied for this zone |
-| `fallback_cooldown_zone_N` | Numeric (0–300 s) | How long to keep light on after presence clears (fallback only) |
+| `fallback_cooldown_zone_N` | Numeric (0–600 s) | How long to keep light on after presence clears (fallback only) |
 
 ### Actions
 
 | Entity | Type | Description |
 |--------|------|-------------|
+| `diag_reset_boot_count` | Select | Set to `Reset` to clear the boot counter to 0 |
 | `restart` | Select | Set to `restart` to reboot the device |
 | `factory_reset_confirm` | Text | Type `factory-reset` exactly to wipe everything |
 | `heartbeat` | Select | Set to `ping` to send a manual heartbeat |
 
-**Total**: 89 entities (11 occupancy, 14 config, 50 zone config, 8 diagnostic sensors, 3 actions, 3 target coordinates)
+**Total**: 89 Zigbee-exposed entities via the external converter (excluding the firmware update entity).
 
 ## Configuration
 
 ### Via Home Assistant
 
-All settings are exposed as entities. Changes are sent to the device over Zigbee, applied to the sensor hardware, and saved to flash — they persist across reboots automatically.
+All settings are exposed as entities. Changes are applied on-device and persist across reboots.
 
 ### Via Serial CLI
 
-Connect a serial terminal at 115200 baud:
+(Available on both ESP32-H2 and ESP32-C6)
+
+Connect a serial terminal at 115200 baud (USB CDC / UART):
 
 ```bash
 ld state                    # View sensor state
@@ -244,24 +294,29 @@ ld coords on                # Enable coordinate publishing
 # Occupancy timing
 ld cooldown 10              # Main sensor cooldown (seconds)
 ld cooldown zone 1 15       # Per-zone cooldown
-ld cooldown all 10          # Set all 11 endpoints
+ld cooldown all 10          # Set all endpoints (global + zones)
 
 ld delay 250                # Main sensor delay (ms)
 ld delay zone 1 500         # Per-zone delay
-ld delay all 250            # Set all 11 endpoints
+ld delay all 250            # Set all endpoints (global + zones)
 
 # Device management
 ld config                   # View current config
 ld diag                     # Crash diagnostics
 ld nvs                      # NVS health check
-ld bt off                   # Disable Bluetooth
+ld bt off                   # LD2450 sensor Bluetooth (off by default; re-disable after sensor reset)
 ld reboot                   # Restart
 ld factory-reset            # Full factory reset
+zb-reset                    # Clear Zigbee network state only (keeps zones and config)
 ```
 
 All CLI changes are saved immediately and persist across reboots.
 
+**Note**: `ld bt` controls the LD2450 sensor's built-in Bluetooth radio, not the MCU. It is disabled by default on first boot. The ESP32-C6's own Bluetooth radio is not used by this firmware.
+
 ### Best Practices
+
+These recommendations reflect real-world tuning and typical deployment behavior.
 
 **During zone setup:**
 1. Turn on **coordinate publishing** — you need to see where targets are
@@ -274,6 +329,8 @@ All CLI changes are saved immediately and persist across reboots.
 2. Switch to **multi-target mode** — tracks up to 3 people for better occupancy accuracy
 
 ### Occupancy Cooldown
+
+Controls how long occupancy remains active after motion stops.
 
 Prevents false "unoccupied" reports when someone briefly moves out of view — for example, walking behind furniture or bending down.
 
@@ -300,6 +357,8 @@ Each endpoint (main + 10 zones) has its own cooldown. Tune per area:
 - Bathroom: 120 s (people move out of view often)
 
 ### Occupancy Delay
+
+Controls how long motion must be present before occupancy is reported.
 
 Prevents false "occupied" reports from brief detections — sensor noise, a hand wave, or someone passing through without entering. Sometimes called anti-ghosting.
 
@@ -379,6 +438,8 @@ You can also trigger a network reset from Z2M (Device → Settings → Remove) o
 
 ## Architecture
 
+The system is designed with a device-authoritative model — all logic runs on-device, with Zigbee acting as the communication layer.
+
 - **Sensor driver**: `components/ld2450/` — UART RX task, protocol parser, zone logic
 - **Command encoder**: `components/ld2450/ld2450_cmd.c` — UART TX, config mode, ACK reader
 - **Zigbee modules**:
@@ -397,6 +458,13 @@ You can also trigger a network reset from Z2M (Device → Settings → Remove) o
 ### Custom Clusters
 
 - **0xFC00** (EP 1): Target count, coordinates, max distance, angle, tracking mode, coordinate publishing, occupancy cooldown/delay, crash diagnostics, restart, factory reset, zone config (vertex count, coords, cooldown, delay for all 10 zones)
+
+## Troubleshooting
+
+- **Device not appearing in Zigbee**: Ensure WiFi is configured on ESP32-C6 before pairing
+- **Missing entities**: Use "Reconfigure" in Z2M
+- **No coordinate data**: Enable coordinate publishing
+- **Device joins but no occupancy updates**: Ensure cooldown/delay settings are not excessively high
 
 ## Acknowledgments
 

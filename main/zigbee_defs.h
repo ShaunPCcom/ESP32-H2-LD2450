@@ -15,8 +15,7 @@
 #define ZB_DEVICE_ID_OCCUPANCY_SENSOR  0x0107
 
 /* ---- Custom cluster IDs (manufacturer-specific range 0xFC00-0xFFFE) ---- */
-#define ZB_CLUSTER_LD2450_CONFIG       0xFC00  /* EP 1: target data + sensor config + zone config */
-/* ZB_CLUSTER_LD2450_ZONE 0xFC01 removed — zone config consolidated to EP1 cluster 0xFC00 */
+#define ZB_CLUSTER_LD2450_CONFIG       0xFC00  /* EP1: sensor config+data; EP2-11: per-zone config */
 
 /* ---- Attributes on ZB_CLUSTER_LD2450_CONFIG (EP 1) ---- */
 #define ZB_ATTR_TARGET_COUNT           0x0000  /* U8, read-only + reportable */
@@ -34,10 +33,12 @@
 #define ZB_ATTR_RESET_REASON           0x0031  /* U8, read-only (last reset cause) */
 #define ZB_ATTR_LAST_UPTIME_SEC        0x0032  /* U32, read-only (uptime before last reset) */
 #define ZB_ATTR_MIN_FREE_HEAP          0x0033  /* U32, read-only (min free heap since boot) */
+#define ZB_ATTR_DIAG_RESET             0x0034  /* U8, write-only (write non-zero to reset boot counter) */
 
 /* ZB_ATTR_RESTART (0x00F0) and ZB_ATTR_FACTORY_RESET (0x00F1) defined in zigbee_ctrl.h */
 
-/* ---- Zone config attributes on EP1 cluster 0xFC00 ---- */
+/* ---- Zone config attributes on EP2-EP11 cluster 0xFC00 (one per zone) ---- */
+/* Zone N (0-indexed) lives on EP ZB_EP_ZONE(N); each EP has exactly these 4 attrs for that zone. */
 /* Base: 0x0040, 4 attrs per zone, n = 0..9 (firmware 0-indexed; Z2M uses 1-indexed zone_1..zone_10) */
 /* Zone N attr range: 0x0040 + N*4 .. 0x0043 + N*4. Zone 9 last attr = 0x006B */
 #define ZB_ZONE_ATTR_BASE(n)           (0x0040 + (n) * 4)
@@ -64,7 +65,11 @@
 
 /* ---- Identity strings ---- */
 #define ZB_MANUFACTURER_NAME           "\x07""LD2450Z"   /* ZCL string: len byte + chars */
+#if defined(CONFIG_IDF_TARGET_ESP32C6)
+#define ZB_MODEL_IDENTIFIER            "\x09""LD2450-C6"
+#else
 #define ZB_MODEL_IDENTIFIER            "\x09""LD2450-H2"
+#endif
 
 /* ---- Shared zigbee_ctrl attributes ---- */
 #include "zigbee_ctrl.h"

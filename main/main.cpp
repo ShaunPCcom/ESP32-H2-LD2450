@@ -14,6 +14,12 @@ extern "C" {
 #include "nvs_config.h"
 #include "zigbee_init.h"
 #include "zigbee_signal_handlers.h"
+#if CONFIG_IDF_TARGET_ESP32C6
+#include "esp_netif.h"
+#include "esp_event.h"
+#include "wifi_manager.h"
+#include "web_server.h"
+#endif
 }
 
 #include "sdkconfig.h"
@@ -74,7 +80,11 @@ extern "C" void app_main(void)
     /* Initialize board LED (C++ BoardLed class) */
     g_board_led = new BoardLed(BOARD_LED_GPIO);
     g_board_led->set_state(BoardLed::State::NOT_JOINED);
-    ESP_LOGI(TAG, "Zigbee role: %s", CONFIG_LD2450_ZB_ROUTER ? "router" : "end device");
+    #if CONFIG_LD2450_ZB_ROUTER
+    ESP_LOGI(TAG, "Zigbee role: router");
+    #else
+    ESP_LOGI(TAG, "Zigbee role: end device");
+    #endif
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -110,8 +120,29 @@ extern "C" void app_main(void)
     /* Bring up CLI early so we can debug even if Zigbee gets noisy */
     ld2450_cli_start();
 
-    /* Zigbee bring-up */
+#if CONFIG_IDF_TARGET_ESP32C6
+    /* Two-mode boot (C6 only):
+     *   Provisioning mode — no WiFi credentials stored: WiFi AP + captive portal,
+     *                        Zigbee NOT started (softAP/802.15.4 coex is broken).
+     *   Operational mode  — credentials present: Zigbee + WiFi STA (coex works). */
+    esp_netif_init();
+    esp_event_loop_create_default();
+    wifi_manager_init("ld2450");
+
+    if (wifi_manager_has_credentials()) {
+        ESP_LOGI(TAG, "Credentials found — operational mode: Zigbee + WiFi STA");
+        zigbee_init();
+        wifi_manager_start();   /* has creds → calls start_sta_mode() */
+    } else {
+        ESP_LOGI(TAG, "No credentials — provisioning mode: WiFi AP only");
+        wifi_manager_start();   /* no creds → calls start_ap_mode() */
+    }
+
+    web_server_start();
+    ESP_LOGI(TAG, "WiFi manager started");
+#else
     zigbee_init();
+#endif
 
     /* Initialize button handler (C++ ButtonHandler class) */
     g_button = new ButtonHandler(BOARD_BUTTON_GPIO,

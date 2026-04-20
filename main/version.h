@@ -32,13 +32,13 @@
  * Minor version number (0-255)
  * Increment for new features that are backward compatible
  */
-#define FW_VERSION_MINOR 1
+#define FW_VERSION_MINOR 4
 
 /**
  * Patch version number (0-255)
  * Increment for bug fixes and minor improvements
  */
-#define FW_VERSION_PATCH 3
+#define FW_VERSION_PATCH 1
 
 /* ============================================================================
  * DERIVED CONSTANTS - Do not modify, these are generated automatically

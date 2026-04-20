@@ -25,6 +25,9 @@
 #include "ld2450_cmd.h"
 #include "nvs_config.h"
 #include "zigbee_signal_handlers.h"
+#if CONFIG_IDF_TARGET_ESP32C6
+#include "wifi_manager.h"
+#endif
 
 static const char *TAG = "ld2450_cli";
 
@@ -67,10 +70,15 @@ static void print_help(void)
         "  ld fallback cooldown zone <1-10> <sec>\n"
         "  ld fallback cooldown all <sec>\n"
         "  ld config\n"
-        "  ld diag                      (show crash diagnostics)\n"
+        "  ld diag [show]               (show crash diagnostics)\n"
+        "  ld diag reset                (reset boot counter to 0)\n"
         "  ld nvs                       (test NVS health)\n"
         "  ld reboot\n"
-        "  ld factory-reset             (FULL reset: erase Zigbee + config)\n\n"
+        "  ld factory-reset             (FULL reset: erase Zigbee + config)\n"
+#if CONFIG_IDF_TARGET_ESP32C6
+        "  ld wifi-reset                (clear WiFi credentials, reboot to AP mode)\n"
+#endif
+        "\n"
     );
 }
 
@@ -219,7 +227,15 @@ static void cli_task(void *arg)
             if (strcmp(cmd, "help") == 0) { print_help(); continue; }
             if (strcmp(cmd, "state") == 0) { print_state(); continue; }
             if (strcmp(cmd, "config") == 0) { print_config(); continue; }
-            if (strcmp(cmd, "diag") == 0) { print_diag(); continue; }
+            if (strcmp(cmd, "diag") == 0) {
+                char *sub = strtok(NULL, " \t\r\n");
+                if (!sub || strcmp(sub, "show") == 0) { print_diag(); }
+                else if (strcmp(sub, "reset") == 0) {
+                    crash_diag_reset_boot_count();
+                    printf("Boot count reset to 0\n");
+                } else { printf("usage: ld diag [show|reset]\n"); }
+                continue;
+            }
 
             if (strcmp(cmd, "en") == 0) {
                 char *v = strtok(NULL, " \t\r\n");
@@ -725,12 +741,29 @@ static void cli_task(void *arg)
                 continue;
             }
 
+            if (strcmp(cmd, "zb-reset") == 0) {
+                printf("Zigbee network reset: clearing Zigbee stack state, keeping device config...\n");
+                fflush(stdout);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                zigbee_factory_reset();
+            }
+
             if (strcmp(cmd, "factory-reset") == 0) {
                 printf("FULL FACTORY RESET: Erasing Zigbee network + NVS config...\n");
                 fflush(stdout);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 zigbee_full_factory_reset();
             }
+
+#if CONFIG_IDF_TARGET_ESP32C6
+            if (strcmp(cmd, "wifi-reset") == 0) {
+                printf("Clearing WiFi credentials — rebooting to AP provisioning mode...\n");
+                fflush(stdout);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                wifi_manager_clear_credentials();
+                esp_restart();
+            }
+#endif
 
             if (strcmp(cmd, "reboot") == 0) {
                 printf("Rebooting...\n");

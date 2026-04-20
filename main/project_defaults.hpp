@@ -50,44 +50,39 @@
 namespace defaults {
 
 // ============================================================================
-// Hardware Configuration - ESP32-H2 GPIO Pin Assignments
+// Hardware Configuration - GPIO Pin Assignments
+// Pins that differ between ESP32-H2 and ESP32-C6 use target guards.
 // ============================================================================
 
 /**
  * UART number for LD2450 sensor communication
  *
- * ESP32-H2 has 3 UART peripherals (UART_NUM_0, UART_NUM_1, UART_NUM_2).
+ * Both H2 and C6 have multiple UART peripherals.
  * UART0 is reserved for console/debugging. UART1 chosen for LD2450 sensor.
- *
- * Why UART1: Available GPIOs pair well with UART1 alternate functions,
- * avoiding routing conflicts with other peripherals.
  */
 constexpr uint8_t LD2450_UART_NUM = 1;  // UART_NUM_1
 
+#if CONFIG_IDF_TARGET_ESP32C6
 /**
- * GPIO for UART TX to LD2450 sensor (ESP32 TX -> Sensor RX)
+ * GPIO for UART TX/RX to LD2450 sensor — ESP32-C6 (nanoESP32-C6 v1.0)
  *
- * Transmits command frames to configure sensor (distance limits, angles,
- * tracking mode, zone definitions). Command rate is low (~1 per second max),
- * so timing not critical.
+ * GPIO12 is unavailable (USB D-), GPIO22 is unavailable (SPI flash).
+ * GPIO10/11 are safe general-purpose GPIOs, no conflicts with radio or button.
+ */
+constexpr uint8_t LD2450_UART_TX_GPIO = 10;
+constexpr uint8_t LD2450_UART_RX_GPIO = 11;
+#elif CONFIG_IDF_TARGET_ESP32H2
+/**
+ * GPIO for UART TX/RX to LD2450 sensor — ESP32-H2 (ESP32-H2-DevKitM-1)
  *
- * Why GPIO12: Paired with GPIO22 for UART1, good signal integrity at 256000 baud.
+ * GPIO12/22 are the standard UART1 pairing on H2 devkit. No conflicts.
  * GPIO9 avoided (shared with BOOT button).
  */
 constexpr uint8_t LD2450_UART_TX_GPIO = 12;
-
-/**
- * GPIO for UART RX from LD2450 sensor (ESP32 RX <- Sensor TX)
- *
- * Receives continuous data stream at 10Hz (100ms intervals). Each frame
- * contains up to 3 target positions (x,y coordinates in mm) plus zone
- * occupancy state. High reliability required - sensor data drives real-time
- * Zigbee occupancy reporting for Home Assistant automations.
- *
- * Why GPIO22: Natural pairing with GPIO12 for UART1. No conflicts with
- * Zigbee radio (2.4GHz) or other critical pins.
- */
 constexpr uint8_t LD2450_UART_RX_GPIO = 22;
+#else
+#  error "Unsupported target - add GPIO definitions for this target"
+#endif
 
 /**
  * UART baud rate for LD2450 sensor communication (256000 bps)

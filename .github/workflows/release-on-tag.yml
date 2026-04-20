@@ -10,10 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
 
@@ -101,7 +103,7 @@ jobs:
         run: |
           git clone --recursive --branch v5.5.2 --depth 1 https://github.com/espressif/esp-idf.git
           cd esp-idf
-          ./install.sh esp32h2
+          ./install.sh esp32h2,esp32c6
 
       - name: Clone ESP Zigbee SDK
         run: |
@@ -109,32 +111,49 @@ jobs:
           git clone --recursive --branch main --depth 1 https://github.com/espressif/esp-zigbee-sdk.git
           ls -la esp-zigbee-sdk/tools/image_builder_tool/
 
-      - name: Build firmware
+      - name: Build firmware (H2)
         run: |
           . esp-idf/export.sh
-          idf.py build
+          idf.py -B build_h2 set-target esp32h2
+          idf.py -B build_h2 build
 
-          echo "✅ Firmware built successfully"
-          ls -lh build/ld2450_zb_h2.bin
+          echo "✅ H2 firmware built"
+          ls -lh build_h2/ld2450_zb_h2.bin
+
+      - name: Build firmware (C6)
+        run: |
+          . esp-idf/export.sh
+          idf.py -B build_c6 set-target esp32c6
+          idf.py -B build_c6 build
+
+          echo "✅ C6 firmware built"
+          ls -lh build_c6/ld2450_zb_h2.bin
 
       - name: Install zigpy for OTA image creation
         run: |
           python3 -m pip install zigpy
 
-      - name: Create OTA image
+      - name: Create OTA images
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           FILE_VERSION_HEX="${{ steps.version.outputs.file_version_hex }}"
 
           python3 esp-zigbee-sdk/tools/image_builder_tool/image_builder_tool.py \
-            -c ld2450_zb_h2_v${VERSION}.ota \
             -v ${FILE_VERSION_HEX} \
             -m 0x131B \
             -i 0x0001 \
-            -f build/ld2450_zb_h2.bin
+            --tag 0 build_h2/ld2450_zb_h2.bin
+          mv 131B-0001-*-ota-file.zigbee ld2450_zb_h2_v${VERSION}.ota
 
-          echo "✅ OTA image created"
-          ls -lh ld2450_zb_h2_v${VERSION}.ota
+          python3 esp-zigbee-sdk/tools/image_builder_tool/image_builder_tool.py \
+            -v ${FILE_VERSION_HEX} \
+            -m 0x131B \
+            -i 0x0003 \
+            --tag 0 build_c6/ld2450_zb_h2.bin
+          mv 131B-0003-*-ota-file.zigbee ld2450_zb_c6_v${VERSION}.ota
+
+          echo "✅ OTA images created"
+          ls -lh ld2450_zb_h2_v${VERSION}.ota ld2450_zb_c6_v${VERSION}.ota
 
       - name: Generate release notes
         id: release_notes
@@ -170,7 +189,8 @@ jobs:
 
           gh release create "${TAG}" \
             ld2450_zb_h2_v${VERSION}.ota \
-            --title "LD2450-ZB-H2 ${TAG} [${CHANNEL}]" \
+            ld2450_zb_c6_v${VERSION}.ota \
+            --title "LD2450-ZB ${TAG} [${CHANNEL}]" \
             --notes-file ${{ steps.release_notes.outputs.notes_file }} \
             ${PRERELEASE_FLAG}
 
@@ -189,6 +209,12 @@ jobs:
               "imageType": 1,
               "fileVersion": ${FILE_VERSION_DEC},
               "url": "https://github.com/${{ github.repository }}/releases/download/${TAG}/ld2450_zb_h2_v${VERSION}.ota"
+            },
+            {
+              "manufacturerCode": 4891,
+              "imageType": 3,
+              "fileVersion": ${FILE_VERSION_DEC},
+              "url": "https://github.com/${{ github.repository }}/releases/download/${TAG}/ld2450_zb_c6_v${VERSION}.ota"
             }
           ]
           EOF
@@ -202,17 +228,23 @@ jobs:
           CHANNEL="${{ steps.version.outputs.channel }}"
           IS_PRERELEASE="${{ steps.version.outputs.is_prerelease }}"
 
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            BRANCH="dev"
+          else
+            BRANCH="master"
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # Fetch and checkout the target branch (workflow runs in detached HEAD at tag commit)
+          git fetch origin ${BRANCH}
+          git checkout ${BRANCH}
+          git pull origin ${BRANCH}
+
           git add z2m/ota_index.json
           git diff --staged --quiet || git commit -m "chore: update ${CHANNEL} OTA index for ${TAG}"
-
-          if [ "$IS_PRERELEASE" = "true" ]; then
-            git push origin HEAD:dev
-          else
-            git push origin HEAD:master
-          fi
+          git push origin ${BRANCH}
 
           echo "✅ OTA index committed and pushed to ${CHANNEL} branch"
 
@@ -224,7 +256,7 @@ jobs:
           echo "📦 Version: ${{ steps.version.outputs.version }}"
           echo "🏷️  Tag: ${{ steps.version.outputs.tag }}"
           echo "📡 Channel: ${CHANNEL}"
-          echo "📄 OTA File: ld2450_zb_h2_v${{ steps.version.outputs.version }}.ota"
+          echo "📄 OTA Files: ld2450_zb_h2_v${{ steps.version.outputs.version }}.ota  ld2450_zb_c6_v${{ steps.version.outputs.version }}.ota"
           echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
           echo ""
           if [ "$CHANNEL" = "beta" ]; then
