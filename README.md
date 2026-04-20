@@ -36,13 +36,14 @@ This Zigbee implementation offers different trade-offs compared to ESPHome-based
 - **Device-local config** — all settings stored on-device, not in the coordinator
 - **Multi-endpoint architecture** — multiple endpoints for cleaner HA organization
 - **Arbitrary polygon zones** — up to 10 configurable areas (3–10 vertices each)
+- **On-device web UI (C6)** — radar visualisation, real-time zone editing, settings, and OTA without needing Home Assistant or Z2M
 
 ### Advantages of ESPHome
 
 - **Unlimited zones** — component supports unlimited zones (vs fixed 10)
 - **Rich per-target data** — individual speed, distance, angle sensors per target
 - **Dynamic zone updates** — runtime polygon updates via actions
-- **Web-based configuration** — ESPHome uses Home Assistant or its builder interface; the C6 target provides a fully on-device UI with real-time zone editing
+- **Web-based configuration** — ESPHome uses its builder interface for device setup
 - **WiFi network tooling** — built-in diagnostics for connectivity and debugging
 
 ### Equivalent Features
@@ -165,7 +166,7 @@ When a new version is available, Home Assistant shows an update notification via
 ### Installing
 
 **Via Home Assistant:**
-1. Go to Settings → Devices & Services → Zigbee2MQTT → [Your LD2450 device]
+1. Go to Settings → Devices & Services → [Your LD2450 device]
 2. Click "Install" on the firmware update card
 3. Monitor progress in the Z2M logs
 4. Device reboots automatically after a successful update
@@ -319,10 +320,10 @@ All CLI changes are saved immediately and persist across reboots.
 These recommendations reflect real-world tuning and typical deployment behavior.
 
 **During zone setup:**
-1. Turn on **coordinate publishing** — you need to see where targets are
+1. Turn on **coordinate publishing** if not on C6 or trying to configure from Home Assistant — you need to see where targets are
 2. Switch to **single target mode** — easier to test one zone at a time
 3. Walk through each zone to verify boundaries
-4. Use a Plotly graph card (see [examples](#examples)) to visualise positions and zones
+4. Use a Plotly graph card (see [examples](#examples)) to visualise positions and zones if not on C6 web UI
 
 **During normal operation:**
 1. Turn off **coordinate publishing** — reduces Zigbee traffic (occupancy is all you need)
@@ -452,12 +453,13 @@ The system is designed with a device-authoritative model — all logic runs on-d
 
 ### Zigbee Endpoints
 
-- **EP 1**: Main device — overall occupancy + all config attributes
-- **EP 2–11**: Zones 1–10 — per-zone occupancy (zone config lives on EP 1)
+- **EP 1**: Main device — overall occupancy, target data, sensor config, occupancy tuning, coordinator fallback (including per-zone fallback cooldowns), diagnostics, controls
+- **EP 2–11**: Zones 1–10 — per-zone occupancy + per-zone config (vertex count, polygon coordinates, cooldown, delay)
 
 ### Custom Clusters
 
-- **0xFC00** (EP 1): Target count, coordinates, max distance, angle, tracking mode, coordinate publishing, occupancy cooldown/delay, crash diagnostics, restart, factory reset, zone config (vertex count, coords, cooldown, delay for all 10 zones)
+- **0xFC00 (EP 1)**: Target count, coordinates, max distance, angle limits, tracking mode, coordinate publishing, occupancy cooldown/delay, coordinator fallback (mode, heartbeat, timeouts, per-zone fallback cooldowns), crash diagnostics, restart, factory reset, boot count reset, heartbeat ping
+- **0xFC00 (EP 2–11)**: Per-zone config — vertex count, polygon coordinates (CSV), occupancy cooldown, occupancy delay
 
 ## Troubleshooting
 
