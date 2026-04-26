@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.6.0 - 2026-04-26
+
+### Features
+- **Real-time config and OTA push via SSE**: The web UI now receives config and OTA
+  status updates over Server-Sent Events instead of polling. Config changes appear
+  immediately rather than on the next 3-second poll. OTA status updates push as they
+  happen — no more 60-second cycle or 5-second fast-poll during updates.
+- **OTA in-progress indicator**: While a firmware update is running, the web UI shows
+  an updating indicator and disables the install button to prevent duplicate triggers.
+
+---
+
 ## v2.5.0 - 2026-04-25
 
 ### Features

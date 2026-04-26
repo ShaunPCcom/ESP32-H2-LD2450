@@ -32,7 +32,7 @@
  * Minor version number (0-255)
  * Increment for new features that are backward compatible
  */
-#define FW_VERSION_MINOR 5
+#define FW_VERSION_MINOR 6
 
 /**
  * Patch version number (0-255)
