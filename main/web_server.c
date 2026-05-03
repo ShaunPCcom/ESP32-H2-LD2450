@@ -165,7 +165,6 @@ static esp_err_t handle_post_config(httpd_req_t *req)
     cJSON_AddStringToObject(resp, "status", "ok");
     send_json(req, 200, resp);
     cJSON_Delete(resp);
-    web_server_base_sse_notify("config");
     return ESP_OK;
 }
 
